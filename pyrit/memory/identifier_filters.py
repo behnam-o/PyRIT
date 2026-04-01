@@ -12,7 +12,7 @@ class _StrEnum(str, Enum):
     """Base class that mimics StrEnum behavior for Python < 3.11."""
 
     def __str__(self) -> str:
-        return self.value
+        return str(self.value)
 
 
 T = TypeVar("T", bound=_StrEnum)
