@@ -14,6 +14,12 @@ from unit.mocks import get_mock_target
 from pyrit.executor.attack.single_turn.prompt_sending import PromptSendingAttack
 from pyrit.identifiers import ComponentIdentifier
 from pyrit.memory import MemoryInterface, PromptMemoryEntry
+from pyrit.memory.identifier_filters import (
+    AttackIdentifierFilter,
+    AttackIdentifierProperty,
+    TargetIdentifierFilter,
+    TargetIdentifierProperty,
+)
 from pyrit.models import (
     Message,
     MessagePiece,
@@ -1248,3 +1254,112 @@ def test_get_request_from_response_raises_error_for_sequence_less_than_one(sqlit
 
     with pytest.raises(ValueError, match="The provided request does not have a preceding request \\(sequence < 1\\)."):
         sqlite_instance.get_request_from_response(response=response_without_request)
+
+
+def test_get_message_pieces_by_attack_identifier_filter(sqlite_instance: MemoryInterface):
+    attack1 = PromptSendingAttack(objective_target=get_mock_target())
+    attack2 = PromptSendingAttack(objective_target=get_mock_target("Target2"))
+
+    entries = [
+        PromptMemoryEntry(
+            entry=MessagePiece(
+                role="user",
+                original_value="Hello 1",
+                attack_identifier=attack1.get_identifier(),
+            )
+        ),
+        PromptMemoryEntry(
+            entry=MessagePiece(
+                role="assistant",
+                original_value="Hello 2",
+                attack_identifier=attack2.get_identifier(),
+            )
+        ),
+    ]
+
+    sqlite_instance._insert_entries(entries=entries)
+
+    # Filter by exact attack hash
+    results = sqlite_instance.get_message_pieces(
+        attack_identifier_filter=AttackIdentifierFilter(
+            property_path=AttackIdentifierProperty.HASH,
+            value_to_match=attack1.get_identifier().hash,
+            partial_match=False,
+        ),
+    )
+    assert len(results) == 1
+    assert results[0].original_value == "Hello 1"
+
+    # No match
+    results = sqlite_instance.get_message_pieces(
+        attack_identifier_filter=AttackIdentifierFilter(
+            property_path=AttackIdentifierProperty.HASH,
+            value_to_match="nonexistent_hash",
+            partial_match=False,
+        ),
+    )
+    assert len(results) == 0
+
+
+def test_get_message_pieces_by_target_identifier_filter(sqlite_instance: MemoryInterface):
+    target_id_1 = ComponentIdentifier(
+        class_name="OpenAIChatTarget",
+        class_module="pyrit.prompt_target",
+        params={"endpoint": "https://api.openai.com", "model_name": "gpt-4"},
+    )
+    target_id_2 = ComponentIdentifier(
+        class_name="AzureChatTarget",
+        class_module="pyrit.prompt_target",
+        params={"endpoint": "https://azure.com", "model_name": "gpt-3.5"},
+    )
+
+    entries = [
+        PromptMemoryEntry(
+            entry=MessagePiece(
+                role="user",
+                original_value="Hello OpenAI",
+                prompt_target_identifier=target_id_1,
+            )
+        ),
+        PromptMemoryEntry(
+            entry=MessagePiece(
+                role="user",
+                original_value="Hello Azure",
+                prompt_target_identifier=target_id_2,
+            )
+        ),
+    ]
+
+    sqlite_instance._insert_entries(entries=entries)
+
+    # Filter by target hash
+    results = sqlite_instance.get_message_pieces(
+        prompt_target_identifier_filter=TargetIdentifierFilter(
+            property_path=TargetIdentifierProperty.HASH,
+            value_to_match=target_id_1.hash,
+            partial_match=False,
+        ),
+    )
+    assert len(results) == 1
+    assert results[0].original_value == "Hello OpenAI"
+
+    # Filter by endpoint partial match
+    results = sqlite_instance.get_message_pieces(
+        prompt_target_identifier_filter=TargetIdentifierFilter(
+            property_path=TargetIdentifierProperty.ENDPOINT,
+            value_to_match="openai",
+            partial_match=True,
+        ),
+    )
+    assert len(results) == 1
+    assert results[0].original_value == "Hello OpenAI"
+
+    # No match
+    results = sqlite_instance.get_message_pieces(
+        prompt_target_identifier_filter=TargetIdentifierFilter(
+            property_path=TargetIdentifierProperty.HASH,
+            value_to_match="nonexistent",
+            partial_match=False,
+        ),
+    )
+    assert len(results) == 0

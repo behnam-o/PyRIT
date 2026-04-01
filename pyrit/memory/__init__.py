@@ -7,6 +7,7 @@ Provide functionality for storing and retrieving conversation history and embedd
 This package defines the core `MemoryInterface` and concrete implementations for different storage backends.
 """
 
+from pyrit.memory.identifier_filters import AttackIdentifierFilter, AttackIdentifierProperty, ConverterIdentifierFilter, ConverterIdentifierProperty, ScorerIdentifierFilter, ScorerIdentifierProperty, TargetIdentifierFilter, TargetIdentifierProperty
 from pyrit.memory.azure_sql_memory import AzureSQLMemory
 from pyrit.memory.central_memory import CentralMemory
 from pyrit.memory.memory_embedding import MemoryEmbedding
@@ -17,6 +18,10 @@ from pyrit.memory.sqlite_memory import SQLiteMemory
 
 __all__ = [
     "AttackResultEntry",
+    "AttackIdentifierFilter",
+    "AttackIdentifierProperty",
+    "ConverterIdentifierFilter",
+    "ConverterIdentifierProperty",
     "AzureSQLMemory",
     "CentralMemory",
     "SQLiteMemory",
@@ -25,5 +30,9 @@ __all__ = [
     "MemoryEmbedding",
     "MemoryExporter",
     "PromptMemoryEntry",
+    "ScorerIdentifierFilter",
+    "ScorerIdentifierProperty",
     "SeedEntry",
+    "TargetIdentifierFilter",
+    "TargetIdentifierProperty",
 ]

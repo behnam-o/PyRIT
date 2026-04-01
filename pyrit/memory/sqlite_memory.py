@@ -177,15 +177,6 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         condition = text(json_conditions).bindparams(**{key: str(value) for key, value in prompt_metadata.items()})
         return [condition]
 
-    def _get_message_pieces_attack_conditions(self, *, attack_id: str) -> Any:
-        """
-        Generate SQLAlchemy filter conditions for filtering by attack ID.
-
-        Returns:
-            Any: A SQLAlchemy text condition with bound parameters.
-        """
-        return text("JSON_EXTRACT(attack_identifier, '$.hash') = :attack_id").bindparams(attack_id=str(attack_id))
-
     def _get_seed_metadata_conditions(self, *, metadata: dict[str, Union[str, int]]) -> Any:
         """
         Generate SQLAlchemy filter conditions for filtering seed prompts by metadata.
@@ -198,6 +189,84 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         # Create SQL condition using SQLAlchemy's text() with bindparams
         # Note: We do NOT convert values to string here, to allow integer comparison in JSON
         return text(json_conditions).bindparams(**dict(metadata.items()))
+
+    def _get_condition_json_property_match(
+        self,
+        *,
+        json_column: Any,
+        property_path: str,
+        value_to_match: str,
+        partial_match: bool = False,
+    ) -> Any:
+        extracted_value = func.json_extract(json_column, property_path)
+        if partial_match:
+            return func.lower(extracted_value).like(f"%{value_to_match.lower()}%")
+        return extracted_value == value_to_match
+
+    def _get_condition_json_array_match(
+        self,
+        *,
+        json_column: Any,
+        property_path: str,
+        array_to_match: Sequence[str],
+        case_insensitive: bool = False,
+    ) -> Any:
+        array_expr = func.json_extract(json_column, property_path)
+        if len(array_to_match) == 0:
+            return or_(
+                json_column.is_(None),
+                array_expr.is_(None),
+                array_expr == "[]",
+            )
+
+        table_name = json_column.class_.__tablename__
+        column_name = json_column.key
+        value_expression = "json_extract(value, '$.class_name')"
+        if case_insensitive:
+            value_expression = f"LOWER({value_expression})"
+
+        conditions = []
+        for index, match_value in enumerate(array_to_match):
+            param_name = f"match_value_{index}"
+            bind_params: dict[str, str] = {
+                "property_path": property_path,
+                param_name: match_value.lower() if case_insensitive else match_value,
+            }
+            conditions.append(
+                text(
+                    f'''EXISTS(SELECT 1 FROM json_each(
+                        json_extract("{table_name}".{column_name}, :property_path))
+                        WHERE {value_expression} = :{param_name})'''
+                ).bindparams(**bind_params)
+            )
+        return and_(*conditions)
+
+    def _get_unique_json_array_values(
+        self,
+        *,
+        json_column: Any,
+        path_to_array: str,
+        sub_path: str | None = None,
+    ) -> list[str]:
+        with closing(self.get_session()) as session:
+            if sub_path is None:
+                property_expr = func.json_extract(json_column, path_to_array)
+                rows = session.query(property_expr).filter(property_expr.isnot(None)).distinct().all()
+            else:
+                table_name = json_column.class_.__tablename__
+                column_name = json_column.key
+                rows = session.execute(
+                    text(
+                        f'''SELECT DISTINCT json_extract(j.value, :sub_path) AS value
+                        FROM "{table_name}",
+                        json_each(json_extract("{table_name}".{column_name}, :path_to_array)) AS j
+                        WHERE json_extract(j.value, :sub_path) IS NOT NULL'''
+                    ).bindparams(
+                        path_to_array=path_to_array,
+                        sub_path=sub_path,
+                    )
+                ).fetchall()
+        return sorted(row[0] for row in rows)
 
     def add_message_pieces_to_memory(self, *, message_pieces: Sequence[MessagePiece]) -> None:
         """
@@ -526,97 +595,6 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         )
         return labels_subquery  # noqa: RET504
 
-    def _get_attack_result_attack_class_condition(self, *, attack_class: str) -> Any:
-        """
-        SQLite implementation for filtering AttackResults by attack class.
-        Uses json_extract() on the atomic_attack_identifier JSON column.
-
-        Returns:
-            Any: A SQLAlchemy condition for filtering by attack class.
-        """
-        return (
-            func.json_extract(AttackResultEntry.atomic_attack_identifier, "$.children.attack.class_name")
-            == attack_class
-        )
-
-    def _get_attack_result_converter_classes_condition(self, *, converter_classes: Sequence[str]) -> Any:
-        """
-        SQLite implementation for filtering AttackResults by converter classes.
-
-        Uses json_extract() on the atomic_attack_identifier JSON column.
-
-        When converter_classes is empty, matches attacks with no converters
-        (children.attack.children.request_converters is absent or null in the JSON).
-        When non-empty, uses json_each() to check all specified classes are present
-        (AND logic, case-insensitive).
-
-        Returns:
-            Any: A SQLAlchemy condition for filtering by converter classes.
-        """
-        if len(converter_classes) == 0:
-            # Explicitly "no converters": match attacks where the converter list
-            # is absent, null, or empty in the stored JSON.
-            converter_json = func.json_extract(
-                AttackResultEntry.atomic_attack_identifier,
-                "$.children.attack.children.request_converters",
-            )
-            return or_(
-                AttackResultEntry.atomic_attack_identifier.is_(None),
-                converter_json.is_(None),
-                converter_json == "[]",
-            )
-
-        conditions = []
-        for i, cls in enumerate(converter_classes):
-            param_name = f"conv_cls_{i}"
-            conditions.append(
-                text(
-                    f"""EXISTS(SELECT 1 FROM json_each(
-                        json_extract("AttackResultEntries".atomic_attack_identifier,
-                            '$.children.attack.children.request_converters'))
-                        WHERE LOWER(json_extract(value, '$.class_name')) = :{param_name})"""
-                ).bindparams(**{param_name: cls.lower()})
-            )
-        return and_(*conditions)
-
-    def get_unique_attack_class_names(self) -> list[str]:
-        """
-        SQLite implementation: extract unique class_name values from
-        the atomic_attack_identifier JSON column.
-
-        Returns:
-            Sorted list of unique attack class name strings.
-        """
-        with closing(self.get_session()) as session:
-            class_name_expr = func.json_extract(
-                AttackResultEntry.atomic_attack_identifier, "$.children.attack.class_name"
-            )
-            rows = session.query(class_name_expr).filter(class_name_expr.isnot(None)).distinct().all()
-        return sorted(row[0] for row in rows)
-
-    def get_unique_converter_class_names(self) -> list[str]:
-        """
-        SQLite implementation: extract unique converter class_name values
-        from the children.attack.children.request_converters array in the
-        atomic_attack_identifier JSON column.
-
-        Returns:
-            Sorted list of unique converter class name strings.
-        """
-        with closing(self.get_session()) as session:
-            rows = session.execute(
-                text(
-                    """SELECT DISTINCT json_extract(j.value, '$.class_name') AS cls
-                    FROM "AttackResultEntries",
-                    json_each(
-                        json_extract("AttackResultEntries".atomic_attack_identifier,
-                            '$.children.attack.children.request_converters')
-                    ) AS j
-                    WHERE cls IS NOT NULL"""
-                )
-            ).fetchall()
-        return sorted(row[0] for row in rows)
-
     def get_conversation_stats(self, *, conversation_ids: Sequence[str]) -> dict[str, ConversationStats]:
         """
         SQLite implementation: lightweight aggregate stats per conversation.
@@ -709,28 +687,4 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         """
         return and_(
             *[func.json_extract(ScenarioResultEntry.labels, f"$.{key}") == value for key, value in labels.items()]
-        )
-
-    def _get_scenario_result_target_endpoint_condition(self, *, endpoint: str) -> Any:
-        """
-        SQLite implementation for filtering ScenarioResults by target endpoint.
-        Uses json_extract() function specific to SQLite.
-
-        Returns:
-            Any: A SQLAlchemy subquery for filtering by target endpoint.
-        """
-        return func.lower(func.json_extract(ScenarioResultEntry.objective_target_identifier, "$.endpoint")).like(
-            f"%{endpoint.lower()}%"
-        )
-
-    def _get_scenario_result_target_model_condition(self, *, model_name: str) -> Any:
-        """
-        SQLite implementation for filtering ScenarioResults by target model name.
-        Uses json_extract() function specific to SQLite.
-
-        Returns:
-            Any: A SQLAlchemy subquery for filtering by target model name.
-        """
-        return func.lower(func.json_extract(ScenarioResultEntry.objective_target_identifier, "$.model_name")).like(
-            f"%{model_name.lower()}%"
         )

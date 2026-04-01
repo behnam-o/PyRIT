@@ -9,6 +9,7 @@ from pyrit.common.utils import to_sha256
 from pyrit.identifiers import ComponentIdentifier
 from pyrit.identifiers.atomic_attack_identifier import build_atomic_attack_identifier
 from pyrit.memory import MemoryInterface
+from pyrit.memory.identifier_filters import AttackIdentifierFilter, AttackIdentifierProperty
 from pyrit.memory.memory_models import AttackResultEntry
 from pyrit.models import (
     AttackOutcome,
@@ -1352,3 +1353,55 @@ def test_get_unique_converter_class_names_skips_no_converters(sqlite_instance: M
 
     result = sqlite_instance.get_unique_converter_class_names()
     assert result == ["Base64Converter"]
+
+
+def test_get_attack_results_by_attack_identifier_filter_hash(sqlite_instance: MemoryInterface):
+    """Test filtering attack results by AttackIdentifierFilter with hash."""
+    ar1 = _make_attack_result_with_identifier("conv_1", "CrescendoAttack")
+    ar2 = _make_attack_result_with_identifier("conv_2", "ManualAttack")
+    sqlite_instance.add_attack_results_to_memory(attack_results=[ar1, ar2])
+
+    # Filter by hash of ar1's attack identifier
+    results = sqlite_instance.get_attack_results(
+        attack_identifier_filter=AttackIdentifierFilter(
+            property_path=AttackIdentifierProperty.HASH,
+            value_to_match=ar1.atomic_attack_identifier.hash,
+            partial_match=False,
+        ),
+    )
+    assert len(results) == 1
+    assert results[0].conversation_id == "conv_1"
+
+
+def test_get_attack_results_by_attack_identifier_filter_class_name(sqlite_instance: MemoryInterface):
+    """Test filtering attack results by AttackIdentifierFilter with class_name."""
+    ar1 = _make_attack_result_with_identifier("conv_1", "CrescendoAttack")
+    ar2 = _make_attack_result_with_identifier("conv_2", "ManualAttack")
+    ar3 = _make_attack_result_with_identifier("conv_3", "CrescendoAttack")
+    sqlite_instance.add_attack_results_to_memory(attack_results=[ar1, ar2, ar3])
+
+    # Filter by partial attack class name
+    results = sqlite_instance.get_attack_results(
+        attack_identifier_filter=AttackIdentifierFilter(
+            property_path=AttackIdentifierProperty.ATTACK_CLASS_NAME,
+            value_to_match="Crescendo",
+            partial_match=True,
+        ),
+    )
+    assert len(results) == 2
+    assert {r.conversation_id for r in results} == {"conv_1", "conv_3"}
+
+
+def test_get_attack_results_by_attack_identifier_filter_no_match(sqlite_instance: MemoryInterface):
+    """Test that AttackIdentifierFilter returns empty when nothing matches."""
+    ar1 = _make_attack_result_with_identifier("conv_1", "CrescendoAttack")
+    sqlite_instance.add_attack_results_to_memory(attack_results=[ar1])
+
+    results = sqlite_instance.get_attack_results(
+        attack_identifier_filter=AttackIdentifierFilter(
+            property_path=AttackIdentifierProperty.HASH,
+            value_to_match="nonexistent_hash",
+            partial_match=False,
+        ),
+    )
+    assert len(results) == 0
