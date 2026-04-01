@@ -319,10 +319,10 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         return text(
             f"""ISJSON("{table_name}".{column_name}) = 1
                 AND LOWER(JSON_VALUE("{table_name}".{column_name}, :property_path)) {"LIKE" if partial_match else "="} :match_property_value"""  # noqa: E501
-            ).bindparams(
-                property_path=property_path,
-                match_property_value=f"%{value_to_match.lower()}%" if partial_match else value_to_match,
-            )
+        ).bindparams(
+            property_path=property_path,
+            match_property_value=f"%{value_to_match.lower()}%" if partial_match else value_to_match,
+        )
         # The above return statement already handles both partial and exact matches
         # The following code is now unreachable and can be removed
 
@@ -360,9 +360,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
             bindparams_dict[param_name] = match_value.lower() if case_insensitive else match_value
 
         combined = " AND ".join(conditions)
-        return text(f"""ISJSON("{table_name}".{column_name}) = 1 AND {combined}""").bindparams(
-            **bindparams_dict
-        )
+        return text(f"""ISJSON("{table_name}".{column_name}) = 1 AND {combined}""").bindparams(**bindparams_dict)
 
     def _get_unique_json_property_values(
         self,

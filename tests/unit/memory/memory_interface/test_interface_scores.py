@@ -231,7 +231,8 @@ async def test_get_seeds_no_filters(sqlite_instance: MemoryInterface):
 
 
 def test_get_scores_by_scorer_identifier_filter(
-    sqlite_instance: MemoryInterface, sample_conversation_entries: Sequence[PromptMemoryEntry],
+    sqlite_instance: MemoryInterface,
+    sample_conversation_entries: Sequence[PromptMemoryEntry],
 ):
     prompt_id = sample_conversation_entries[0].id
     sqlite_instance._insert_entries(entries=sample_conversation_entries)

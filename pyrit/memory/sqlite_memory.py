@@ -234,9 +234,9 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
             }
             conditions.append(
                 text(
-                    f'''EXISTS(SELECT 1 FROM json_each(
+                    f"""EXISTS(SELECT 1 FROM json_each(
                         json_extract("{table_name}".{column_name}, :property_path))
-                        WHERE {value_expression} = :{param_name})'''
+                        WHERE {value_expression} = :{param_name})"""
                 ).bindparams(**bind_params)
             )
         return and_(*conditions)
@@ -257,10 +257,10 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
                 column_name = json_column.key
                 rows = session.execute(
                     text(
-                        f'''SELECT DISTINCT json_extract(j.value, :sub_path) AS value
+                        f"""SELECT DISTINCT json_extract(j.value, :sub_path) AS value
                         FROM "{table_name}",
                         json_each(json_extract("{table_name}".{column_name}, :path_to_array)) AS j
-                        WHERE json_extract(j.value, :sub_path) IS NOT NULL'''
+                        WHERE json_extract(j.value, :sub_path) IS NOT NULL"""
                     ).bindparams(
                         path_to_array=path_to_array,
                         sub_path=sub_path,

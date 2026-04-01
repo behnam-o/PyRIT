@@ -374,7 +374,7 @@ class MemoryInterface(abc.ABC):
         """
         return self._get_unique_json_array_values(
             json_column=AttackResultEntry.atomic_attack_identifier,
-            path_to_array=AttackIdentifierProperty.ATTACK_CLASS_NAME
+            path_to_array=AttackIdentifierProperty.ATTACK_CLASS_NAME,
         )
 
     def get_unique_converter_class_names(self) -> list[str]:
@@ -638,7 +638,7 @@ class MemoryInterface(abc.ABC):
             not_data_type (Optional[str], optional): The data type to exclude. Defaults to None.
             converted_value_sha256 (Optional[Sequence[str]], optional): A list of SHA256 hashes of converted values.
                 Defaults to None.
-            attack_identifier_filter (Optional[AttackIdentifierFilter], optional): 
+            attack_identifier_filter (Optional[AttackIdentifierFilter], optional):
                 An AttackIdentifierFilter object that
                 allows filtering by various attack identifier JSON properties. Defaults to None.
             prompt_target_identifier_filter (Optional[TargetIdentifierFilter], optional):
@@ -658,7 +658,7 @@ class MemoryInterface(abc.ABC):
                 self._get_condition_json_property_match(
                     json_column=PromptMemoryEntry.attack_identifier,
                     property_path=AttackIdentifierProperty.HASH,
-                    value_to_match=str(attack_id)
+                    value_to_match=str(attack_id),
                 )
             )
         if role:
@@ -1770,12 +1770,12 @@ class MemoryInterface(abc.ABC):
             # Use database-specific JSON query method
             conditions.append(
                 self._get_condition_json_property_match(
-                json_column=ScenarioResultEntry.objective_target_identifier,
-                property_path=TargetIdentifierProperty.ENDPOINT,
-                value_to_match=objective_target_endpoint,
-                partial_match=True,
+                    json_column=ScenarioResultEntry.objective_target_identifier,
+                    property_path=TargetIdentifierProperty.ENDPOINT,
+                    value_to_match=objective_target_endpoint,
+                    partial_match=True,
+                )
             )
-        )
 
         if objective_target_model_name:
             # Use database-specific JSON query method
