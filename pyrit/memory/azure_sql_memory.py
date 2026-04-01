@@ -362,7 +362,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         combined = " AND ".join(conditions)
         return text(f"""ISJSON("{table_name}".{column_name}) = 1 AND {combined}""").bindparams(**bindparams_dict)
 
-    def _get_unique_json_property_values(
+    def _get_unique_json_array_values(
         self,
         *,
         json_column: Any,
