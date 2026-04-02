@@ -330,7 +330,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         json_column: Any,
         property_path: str,
         sub_path: str | None = None,
-        array_to_match: Sequence[str]
+        array_to_match: Sequence[str],
     ) -> Any:
         table_name = json_column.class_.__tablename__
         column_name = json_column.key
