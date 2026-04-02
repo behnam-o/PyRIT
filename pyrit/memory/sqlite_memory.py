@@ -268,6 +268,27 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
                 ).fetchall()
         return sorted(row[0] for row in rows)
 
+    def get_unique_attack_class_names(self) -> list[str]:
+        """
+        SQLite implementation: extract unique class_name values from
+        the atomic_attack_identifier JSON column.
+
+        Returns:
+            Sorted list of unique attack class name strings.
+        """
+        return super().get_unique_attack_class_names()
+
+    def get_unique_converter_class_names(self) -> list[str]:
+        """
+        SQLite implementation: extract unique converter class_name values
+        from the children.attack.children.request_converters array in the
+        atomic_attack_identifier JSON column.
+
+        Returns:
+            Sorted list of unique converter class name strings.
+        """
+        return super().get_unique_converter_class_names()
+
     def add_message_pieces_to_memory(self, *, message_pieces: Sequence[MessagePiece]) -> None:
         """
         Insert a list of message pieces into the memory storage.

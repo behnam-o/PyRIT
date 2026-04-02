@@ -571,6 +571,27 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         """
         self._insert_entries(entries=[PromptMemoryEntry(entry=piece) for piece in message_pieces])
 
+    def get_unique_attack_class_names(self) -> list[str]:
+        """
+        Azure SQL implementation: extract unique class_name values from
+        the atomic_attack_identifier JSON column.
+
+        Returns:
+            Sorted list of unique attack class name strings.
+        """
+        return super().get_unique_attack_class_names()
+
+    def get_unique_converter_class_names(self) -> list[str]:
+        """
+        Azure SQL implementation: extract unique converter class_name values
+        from the children.attack.children.request_converters array
+        in the atomic_attack_identifier JSON column.
+
+        Returns:
+            Sorted list of unique converter class name strings.
+        """
+        return super().get_unique_converter_class_names()
+
     def dispose_engine(self) -> None:
         """
         Dispose the engine and clean up resources.
