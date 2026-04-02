@@ -198,18 +198,18 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         value_to_match: str,
         partial_match: bool = False,
     ) -> Any:
-        extracted_value = func.json_extract(json_column, property_path)
+        extracted_value = func.lower(func.json_extract(json_column, property_path))
         if partial_match:
-            return func.lower(extracted_value).like(f"%{value_to_match.lower()}%")
-        return extracted_value == value_to_match
+            return extracted_value.like(f"%{value_to_match.lower()}%")
+        return extracted_value == value_to_match.lower()
 
     def _get_condition_json_array_match(
         self,
         *,
         json_column: Any,
         property_path: str,
+        sub_path: str | None = None,
         array_to_match: Sequence[str],
-        case_insensitive: bool = False,
     ) -> Any:
         array_expr = func.json_extract(json_column, property_path)
         if len(array_to_match) == 0:
@@ -221,16 +221,14 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
 
         table_name = json_column.class_.__tablename__
         column_name = json_column.key
-        value_expression = "json_extract(value, '$.class_name')"
-        if case_insensitive:
-            value_expression = f"LOWER({value_expression})"
+        value_expression = f"LOWER(json_extract(value, '{sub_path}'))" if sub_path else "LOWER(value)"
 
         conditions = []
         for index, match_value in enumerate(array_to_match):
             param_name = f"match_value_{index}"
             bind_params: dict[str, str] = {
                 "property_path": property_path,
-                param_name: match_value.lower() if case_insensitive else match_value,
+                param_name: match_value.lower(),
             }
             conditions.append(
                 text(

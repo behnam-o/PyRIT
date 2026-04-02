@@ -149,8 +149,8 @@ class MemoryInterface(abc.ABC):
         *,
         json_column: InstrumentedAttribute[Any],
         property_path: str,
+        sub_path: Optional[str] = None,
         array_to_match: Sequence[str],
-        case_insensitive: bool = False,
     ) -> Any:
         """
         Return a database-specific condition for matching an array at a given path within a JSON object.
@@ -158,10 +158,10 @@ class MemoryInterface(abc.ABC):
         Args:
             json_column (InstrumentedAttribute[Any]): The JSON-backed SQLAlchemy field to query.
             property_path (str): The JSON path for the target array.
+            sub_path (Optional[str]): An optional JSON path applied to each array item before matching.
             array_to_match (Sequence[str]): The array that must match the extracted JSON array values.
             For a match, ALL values in this array must be present in the JSON array.
             If `array_to_match` is empty, the condition must match only if the target is also an empty array or None.
-            case_insensitive (bool): Whether string comparison should ignore casing.
 
         Returns:
             Any: A database-specific SQLAlchemy condition.
@@ -1500,8 +1500,8 @@ class MemoryInterface(abc.ABC):
                 self._get_condition_json_array_match(
                     json_column=AttackResultEntry.atomic_attack_identifier,
                     property_path=AttackIdentifierProperty.REQUEST_CONVERTERS,
+                    sub_path=ConverterIdentifierProperty.CLASS_NAME,
                     array_to_match=converter_classes,
-                    case_insensitive=True,
                 )
             )
 

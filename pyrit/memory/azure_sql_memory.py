@@ -321,18 +321,16 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
                 AND LOWER(JSON_VALUE("{table_name}".{column_name}, :property_path)) {"LIKE" if partial_match else "="} :match_property_value"""  # noqa: E501
         ).bindparams(
             property_path=property_path,
-            match_property_value=f"%{value_to_match.lower()}%" if partial_match else value_to_match,
+            match_property_value=f"%{value_to_match.lower()}%",
         )
-        # The above return statement already handles both partial and exact matches
-        # The following code is now unreachable and can be removed
 
     def _get_condition_json_array_match(
         self,
         *,
         json_column: Any,
         property_path: str,
-        array_to_match: Sequence[str],
-        case_insensitive: bool = False,
+        sub_path: str | None = None,
+        array_to_match: Sequence[str]
     ) -> Any:
         table_name = json_column.class_.__tablename__
         column_name = json_column.key
@@ -343,9 +341,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
                 OR JSON_QUERY("{table_name}".{column_name}, :property_path) = '[]')"""
             ).bindparams(property_path=property_path)
 
-        value_expression = "JSON_VALUE(value, '$.class_name')"
-        if case_insensitive:
-            value_expression = f"LOWER({value_expression})"
+        value_expression = f"LOWER(JSON_VALUE(value, '{sub_path}'))" if sub_path else "LOWER(value)"
 
         conditions = []
         bindparams_dict: dict[str, str] = {"property_path": property_path}
@@ -357,7 +353,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
                     :property_path))
                     WHERE {value_expression} = :{param_name})"""
             )
-            bindparams_dict[param_name] = match_value.lower() if case_insensitive else match_value
+            bindparams_dict[param_name] = match_value.lower()
 
         combined = " AND ".join(conditions)
         return text(f"""ISJSON("{table_name}".{column_name}) = 1 AND {combined}""").bindparams(**bindparams_dict)
