@@ -11,7 +11,3 @@ class IdentifierFilter:
     property_path: str
     value_to_match: str
     partial_match: bool = False
-
-    def __post_init__(self) -> None:
-        """Normalize and validate the configured property path."""
-        object.__setattr__(self, "property_path", str(self.property_path))
