@@ -9,16 +9,7 @@ This package defines the core `MemoryInterface` and concrete implementations for
 
 from pyrit.memory.azure_sql_memory import AzureSQLMemory
 from pyrit.memory.central_memory import CentralMemory
-from pyrit.memory.identifier_filters import (
-    AttackIdentifierFilter,
-    AttackIdentifierProperty,
-    ConverterIdentifierFilter,
-    ConverterIdentifierProperty,
-    ScorerIdentifierFilter,
-    ScorerIdentifierProperty,
-    TargetIdentifierFilter,
-    TargetIdentifierProperty,
-)
+from pyrit.memory.identifier_filters import IdentifierFilter
 from pyrit.memory.memory_embedding import MemoryEmbedding
 from pyrit.memory.memory_exporter import MemoryExporter
 from pyrit.memory.memory_interface import MemoryInterface
@@ -27,10 +18,6 @@ from pyrit.memory.sqlite_memory import SQLiteMemory
 
 __all__ = [
     "AttackResultEntry",
-    "AttackIdentifierFilter",
-    "AttackIdentifierProperty",
-    "ConverterIdentifierFilter",
-    "ConverterIdentifierProperty",
     "AzureSQLMemory",
     "CentralMemory",
     "SQLiteMemory",
@@ -39,9 +26,6 @@ __all__ = [
     "MemoryEmbedding",
     "MemoryExporter",
     "PromptMemoryEntry",
-    "ScorerIdentifierFilter",
-    "ScorerIdentifierProperty",
     "SeedEntry",
-    "TargetIdentifierFilter",
-    "TargetIdentifierProperty",
+    "IdentifierFilter",
 ]

@@ -9,7 +9,7 @@ from unit.mocks import get_mock_scorer_identifier
 
 from pyrit.identifiers import ComponentIdentifier
 from pyrit.memory import MemoryInterface
-from pyrit.memory.identifier_filters import TargetIdentifierFilter, TargetIdentifierProperty
+from pyrit.memory.identifier_filters import IdentifierFilter
 from pyrit.models import (
     AttackOutcome,
     AttackResult,
@@ -649,7 +649,7 @@ def test_combined_filters(sqlite_instance: MemoryInterface):
 
 
 def test_get_scenario_results_by_target_identifier_filter_hash(sqlite_instance: MemoryInterface):
-    """Test filtering scenario results by TargetIdentifierFilter with hash."""
+    """Test filtering scenario results by identifier filter."""
     target_id_1 = ComponentIdentifier(
         class_name="OpenAI",
         class_module="test",
@@ -681,8 +681,8 @@ def test_get_scenario_results_by_target_identifier_filter_hash(sqlite_instance: 
 
     # Filter by target hash
     results = sqlite_instance.get_scenario_results(
-        objective_target_identifier_filter=TargetIdentifierFilter(
-            property_path=TargetIdentifierProperty.HASH,
+        objective_target_identifier_filter=IdentifierFilter(
+            property_path="$.hash",
             value_to_match=target_id_1.hash,
             partial_match=False,
         ),
@@ -692,7 +692,7 @@ def test_get_scenario_results_by_target_identifier_filter_hash(sqlite_instance: 
 
 
 def test_get_scenario_results_by_target_identifier_filter_endpoint(sqlite_instance: MemoryInterface):
-    """Test filtering scenario results by TargetIdentifierFilter with endpoint."""
+    """Test filtering scenario results by identifier filter with endpoint."""
     target_id_1 = ComponentIdentifier(
         class_name="OpenAI",
         class_module="test",
@@ -724,8 +724,8 @@ def test_get_scenario_results_by_target_identifier_filter_endpoint(sqlite_instan
 
     # Filter by endpoint partial match
     results = sqlite_instance.get_scenario_results(
-        objective_target_identifier_filter=TargetIdentifierFilter(
-            property_path=TargetIdentifierProperty.ENDPOINT,
+        objective_target_identifier_filter=IdentifierFilter(
+            property_path="$.endpoint",
             value_to_match="openai",
             partial_match=True,
         ),
@@ -752,8 +752,8 @@ def test_get_scenario_results_by_target_identifier_filter_no_match(sqlite_instan
     sqlite_instance.add_scenario_results_to_memory(scenario_results=[scenario1])
 
     results = sqlite_instance.get_scenario_results(
-        objective_target_identifier_filter=TargetIdentifierFilter(
-            property_path=TargetIdentifierProperty.HASH,
+        objective_target_identifier_filter=IdentifierFilter(
+            property_path="$.hash",
             value_to_match="nonexistent_hash",
             partial_match=False,
         ),

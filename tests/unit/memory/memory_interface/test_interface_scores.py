@@ -13,7 +13,7 @@ from unit.mocks import get_mock_target
 from pyrit.executor.attack.single_turn.prompt_sending import PromptSendingAttack
 from pyrit.identifiers import ComponentIdentifier
 from pyrit.memory import MemoryInterface, PromptMemoryEntry
-from pyrit.memory.identifier_filters import ScorerIdentifierFilter, ScorerIdentifierProperty
+from pyrit.memory.identifier_filters import IdentifierFilter
 from pyrit.models import (
     MessagePiece,
     Score,
@@ -262,8 +262,8 @@ def test_get_scores_by_scorer_identifier_filter(
 
     # Filter by exact class_name match
     results = sqlite_instance.get_scores(
-        scorer_identifier_filter=ScorerIdentifierFilter(
-            property_path=ScorerIdentifierProperty.CLASS_NAME,
+        scorer_identifier_filter=IdentifierFilter(
+            property_path="$.class_name",
             value_to_match="ScorerAlpha",
             partial_match=False,
         ),
@@ -273,8 +273,8 @@ def test_get_scores_by_scorer_identifier_filter(
 
     # Filter by partial class_name match
     results = sqlite_instance.get_scores(
-        scorer_identifier_filter=ScorerIdentifierFilter(
-            property_path=ScorerIdentifierProperty.CLASS_NAME,
+        scorer_identifier_filter=IdentifierFilter(
+            property_path="$.class_name",
             value_to_match="Scorer",
             partial_match=True,
         ),
@@ -284,8 +284,8 @@ def test_get_scores_by_scorer_identifier_filter(
     # Filter by hash
     scorer_hash = score_a.scorer_class_identifier.hash
     results = sqlite_instance.get_scores(
-        scorer_identifier_filter=ScorerIdentifierFilter(
-            property_path=ScorerIdentifierProperty.HASH,
+        scorer_identifier_filter=IdentifierFilter(
+            property_path="$.hash",
             value_to_match=scorer_hash,
             partial_match=False,
         ),
@@ -295,8 +295,8 @@ def test_get_scores_by_scorer_identifier_filter(
 
     # No match
     results = sqlite_instance.get_scores(
-        scorer_identifier_filter=ScorerIdentifierFilter(
-            property_path=ScorerIdentifierProperty.CLASS_NAME,
+        scorer_identifier_filter=IdentifierFilter(
+            property_path="$.class_name",
             value_to_match="NonExistent",
             partial_match=False,
         ),

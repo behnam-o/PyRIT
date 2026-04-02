@@ -19,14 +19,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from pyrit.common.path import DB_DATA_PATH
-from pyrit.memory.identifier_filters import (
-    AttackIdentifierFilter,
-    AttackIdentifierProperty,
-    ConverterIdentifierProperty,
-    ScorerIdentifierFilter,
-    TargetIdentifierFilter,
-    TargetIdentifierProperty,
-)
+from pyrit.memory.identifier_filters import IdentifierFilter
 from pyrit.memory.memory_embedding import (
     MemoryEmbedding,
     default_memory_embedding_factory,
@@ -374,7 +367,7 @@ class MemoryInterface(abc.ABC):
         """
         return self._get_unique_json_array_values(
             json_column=AttackResultEntry.atomic_attack_identifier,
-            path_to_array=AttackIdentifierProperty.ATTACK_CLASS_NAME,
+            path_to_array="$.children.attack.class_name",
         )
 
     def get_unique_converter_class_names(self) -> list[str]:
@@ -389,8 +382,8 @@ class MemoryInterface(abc.ABC):
         """
         return self._get_unique_json_array_values(
             json_column=AttackResultEntry.atomic_attack_identifier,
-            path_to_array=AttackIdentifierProperty.REQUEST_CONVERTERS,
-            sub_path=ConverterIdentifierProperty.CLASS_NAME,
+            path_to_array="$.children.attack.children.request_converters",
+            sub_path="$.class_name",
         )
 
     @abc.abstractmethod
@@ -447,7 +440,7 @@ class MemoryInterface(abc.ABC):
         score_category: Optional[str] = None,
         sent_after: Optional[datetime] = None,
         sent_before: Optional[datetime] = None,
-        scorer_identifier_filter: Optional[ScorerIdentifierFilter] = None,
+        scorer_identifier_filter: Optional[IdentifierFilter] = None,
     ) -> Sequence[Score]:
         """
         Retrieve a list of Score objects based on the specified filters.
@@ -458,7 +451,7 @@ class MemoryInterface(abc.ABC):
             score_category (Optional[str]): The category of the score to filter by.
             sent_after (Optional[datetime]): Filter for scores sent after this datetime.
             sent_before (Optional[datetime]): Filter for scores sent before this datetime.
-            scorer_identifier_filter (Optional[ScorerIdentifierFilter]): A ScorerIdentifierFilter object that
+            scorer_identifier_filter (Optional[IdentifierFilter]): An IdentifierFilter object that
                 allows filtering by various scorer identifier JSON properties. Defaults to None.
 
         Returns:
@@ -615,8 +608,8 @@ class MemoryInterface(abc.ABC):
         data_type: Optional[str] = None,
         not_data_type: Optional[str] = None,
         converted_value_sha256: Optional[Sequence[str]] = None,
-        attack_identifier_filter: Optional[AttackIdentifierFilter] = None,
-        prompt_target_identifier_filter: Optional[TargetIdentifierFilter] = None,
+        attack_identifier_filter: Optional[IdentifierFilter] = None,
+        prompt_target_identifier_filter: Optional[IdentifierFilter] = None,
     ) -> Sequence[MessagePiece]:
         """
         Retrieve a list of MessagePiece objects based on the specified filters.
@@ -638,11 +631,11 @@ class MemoryInterface(abc.ABC):
             not_data_type (Optional[str], optional): The data type to exclude. Defaults to None.
             converted_value_sha256 (Optional[Sequence[str]], optional): A list of SHA256 hashes of converted values.
                 Defaults to None.
-            attack_identifier_filter (Optional[AttackIdentifierFilter], optional):
-                An AttackIdentifierFilter object that
+            attack_identifier_filter (Optional[IdentifierFilter], optional):
+                An IdentifierFilter object that
                 allows filtering by various attack identifier JSON properties. Defaults to None.
-            prompt_target_identifier_filter (Optional[TargetIdentifierFilter], optional):
-                A TargetIdentifierFilter object that
+            prompt_target_identifier_filter (Optional[IdentifierFilter], optional):
+                An IdentifierFilter object that
                 allows filtering by various target identifier JSON properties. Defaults to None.
 
         Returns:
@@ -657,7 +650,7 @@ class MemoryInterface(abc.ABC):
             conditions.append(
                 self._get_condition_json_property_match(
                     json_column=PromptMemoryEntry.attack_identifier,
-                    property_path=AttackIdentifierProperty.HASH,
+                    property_path="$.hash",
                     value_to_match=str(attack_id),
                 )
             )
@@ -1431,7 +1424,7 @@ class MemoryInterface(abc.ABC):
         converter_classes: Optional[Sequence[str]] = None,
         targeted_harm_categories: Optional[Sequence[str]] = None,
         labels: Optional[dict[str, str]] = None,
-        attack_identifier_filter: Optional[AttackIdentifierFilter] = None,
+        attack_identifier_filter: Optional[IdentifierFilter] = None,
     ) -> Sequence[AttackResult]:
         """
         Retrieve a list of AttackResult objects based on the specified filters.
@@ -1459,8 +1452,8 @@ class MemoryInterface(abc.ABC):
             labels (Optional[dict[str, str]], optional): A dictionary of memory labels to filter results by.
                 These labels are associated with the prompts themselves, used for custom tagging and tracking.
                 Defaults to None.
-            attack_identifier_filter (Optional[AttackIdentifierFilter], optional):
-                An AttackIdentifierFilter object that allows filtering by various attack identifier
+            attack_identifier_filter (Optional[IdentifierFilter], optional):
+                An IdentifierFilter object that allows filtering by various attack identifier
                 JSON properties. Defaults to None.
 
         Returns:
@@ -1488,7 +1481,7 @@ class MemoryInterface(abc.ABC):
             conditions.append(
                 self._get_condition_json_property_match(
                     json_column=AttackResultEntry.atomic_attack_identifier,
-                    property_path=AttackIdentifierProperty.ATTACK_CLASS_NAME,
+                    property_path="$.children.attack.class_name",
                     value_to_match=attack_class,
                 )
             )
@@ -1499,8 +1492,8 @@ class MemoryInterface(abc.ABC):
             conditions.append(
                 self._get_condition_json_array_match(
                     json_column=AttackResultEntry.atomic_attack_identifier,
-                    property_path=AttackIdentifierProperty.REQUEST_CONVERTERS,
-                    sub_path=ConverterIdentifierProperty.CLASS_NAME,
+                    property_path="$.children.attack.children.request_converters",
+                    sub_path="$.class_name",
                     array_to_match=converter_classes,
                 )
             )
@@ -1705,7 +1698,7 @@ class MemoryInterface(abc.ABC):
         labels: Optional[dict[str, str]] = None,
         objective_target_endpoint: Optional[str] = None,
         objective_target_model_name: Optional[str] = None,
-        objective_target_identifier_filter: Optional[TargetIdentifierFilter] = None,
+        objective_target_identifier_filter: Optional[IdentifierFilter] = None,
     ) -> Sequence[ScenarioResult]:
         """
         Retrieve a list of ScenarioResult objects based on the specified filters.
@@ -1729,8 +1722,8 @@ class MemoryInterface(abc.ABC):
             objective_target_model_name (Optional[str], optional): Filter for scenarios where the
                 objective_target_identifier has a model_name attribute containing this value (case-insensitive).
                 Defaults to None.
-            objective_target_identifier_filter (Optional[TargetIdentifierFilter], optional):
-                A TargetIdentifierFilter object that allows filtering by various target identifier JSON properties.
+            objective_target_identifier_filter (Optional[IdentifierFilter], optional):
+                An IdentifierFilter object that allows filtering by various target identifier JSON properties.
 
         Returns:
             Sequence[ScenarioResult]: A list of ScenarioResult objects that match the specified filters.
@@ -1771,7 +1764,7 @@ class MemoryInterface(abc.ABC):
             conditions.append(
                 self._get_condition_json_property_match(
                     json_column=ScenarioResultEntry.objective_target_identifier,
-                    property_path=TargetIdentifierProperty.ENDPOINT,
+                    property_path="$.endpoint",
                     value_to_match=objective_target_endpoint,
                     partial_match=True,
                 )
@@ -1782,7 +1775,7 @@ class MemoryInterface(abc.ABC):
             conditions.append(
                 self._get_condition_json_property_match(
                     json_column=ScenarioResultEntry.objective_target_identifier,
-                    property_path=TargetIdentifierProperty.MODEL_NAME,
+                    property_path="$.model_name",
                     value_to_match=objective_target_model_name,
                     partial_match=True,
                 )
