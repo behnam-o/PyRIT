@@ -267,10 +267,12 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
                         FROM "{table_name}",
                         json_each(json_extract("{table_name}".{column_name}, :{pa_param})) AS j
                         WHERE json_extract(j.value, :{sp_param}) IS NOT NULL"""
-                    ).bindparams(**{
-                        pa_param: path_to_array,
-                        sp_param: sub_path,
-                    })
+                    ).bindparams(
+                        **{
+                            pa_param: path_to_array,
+                            sp_param: sub_path,
+                        }
+                    )
                 ).fetchall()
         return sorted(row[0] for row in rows)
 

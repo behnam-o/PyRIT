@@ -322,10 +322,12 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         return text(
             f"""ISJSON("{table_name}".{column_name}) = 1
                 AND LOWER(JSON_VALUE("{table_name}".{column_name}, :{pp_param})) {"LIKE" if partial_match else "="} :{mv_param}"""  # noqa: E501
-        ).bindparams(**{
-            pp_param: property_path,
-            mv_param: f"%{value_to_match.lower()}%" if partial_match else value_to_match.lower(),
-        })
+        ).bindparams(
+            **{
+                pp_param: property_path,
+                mv_param: f"%{value_to_match.lower()}%" if partial_match else value_to_match.lower(),
+            }
+        )
 
     def _get_condition_json_array_match(
         self,
@@ -397,10 +399,12 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
                         CROSS APPLY OPENJSON(JSON_QUERY("{table_name}".{column_name}, :{pa_param})) AS items
                         WHERE ISJSON("{table_name}".{column_name}) = 1
                         AND JSON_VALUE(items.value, :{sp_param}) IS NOT NULL"""
-                    ).bindparams(**{
-                        pa_param: path_to_array,
-                        sp_param: sub_path,
-                    })
+                    ).bindparams(
+                        **{
+                            pa_param: path_to_array,
+                            sp_param: sub_path,
+                        }
+                    )
                 ).fetchall()
         return sorted(row[0] for row in rows)
 
