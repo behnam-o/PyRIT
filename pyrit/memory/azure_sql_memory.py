@@ -341,10 +341,12 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
                 OR JSON_QUERY("{table_name}".{column_name}, :property_path) = '[]')"""
             ).bindparams(property_path=property_path)
 
-        value_expression = f"LOWER(JSON_VALUE(value, '{sub_path}'))" if sub_path else "LOWER(value)"
+        value_expression = "LOWER(JSON_VALUE(value, :sub_path))" if sub_path else "LOWER(value)"
 
         conditions = []
         bindparams_dict: dict[str, str] = {"property_path": property_path}
+        if sub_path:
+            bindparams_dict["sub_path"] = sub_path
 
         for index, match_value in enumerate(array_to_match):
             param_name = f"match_value_{index}"

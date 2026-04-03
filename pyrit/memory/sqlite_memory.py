@@ -221,7 +221,7 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
 
         table_name = json_column.class_.__tablename__
         column_name = json_column.key
-        value_expression = f"LOWER(json_extract(value, '{sub_path}'))" if sub_path else "LOWER(value)"
+        value_expression = "LOWER(json_extract(value, :sub_path))" if sub_path else "LOWER(value)"
 
         conditions = []
         for index, match_value in enumerate(array_to_match):
@@ -230,6 +230,8 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
                 "property_path": property_path,
                 param_name: match_value.lower(),
             }
+            if sub_path:
+                bind_params["sub_path"] = sub_path
             conditions.append(
                 text(
                     f"""EXISTS(SELECT 1 FROM json_each(
