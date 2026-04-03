@@ -343,10 +343,14 @@ def test_get_condition_json_property_match_bind_params(
         value_to_match="TestValue",
         partial_match=partial_match,
     )
-    # Extract the compiled bind parameters
+    # Extract the compiled bind parameters (param names include a random uid suffix)
     params = condition.compile().params
-    assert params["match_property_value"] == expected_value
-    assert params["property_path"] == "$.key"
+    pp_params = {k: v for k, v in params.items() if k.startswith("pp_")}
+    mv_params = {k: v for k, v in params.items() if k.startswith("mv_")}
+    assert len(pp_params) == 1
+    assert list(pp_params.values())[0] == "$.key"
+    assert len(mv_params) == 1
+    assert list(mv_params.values())[0] == expected_value
 
 
 def test_update_prompt_metadata_by_conversation_id(memory_interface: AzureSQLMemory):

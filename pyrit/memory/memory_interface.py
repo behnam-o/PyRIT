@@ -75,6 +75,11 @@ class MemoryInterface(abc.ABC):
     results_path: str = None
     engine: Engine = None
 
+    @staticmethod
+    def _uid() -> str:
+        """Return a short unique suffix for bind-param deduplication."""
+        return uuid.uuid4().hex[:8]
+
     def __init__(self, embedding_model: Optional[Any] = None) -> None:
         """
         Initialize the MemoryInterface.

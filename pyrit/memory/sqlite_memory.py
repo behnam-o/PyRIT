@@ -219,24 +219,27 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
                 array_expr == "[]",
             )
 
+        uid = self._uid()
         table_name = json_column.class_.__tablename__
         column_name = json_column.key
-        value_expression = "LOWER(json_extract(value, :sub_path))" if sub_path else "LOWER(value)"
+        pp_param = f"property_path_{uid}"
+        sp_param = f"sub_path_{uid}"
+        value_expression = f"LOWER(json_extract(value, :{sp_param}))" if sub_path else "LOWER(value)"
 
         conditions = []
         for index, match_value in enumerate(array_to_match):
-            param_name = f"match_value_{index}"
+            mv_param = f"mv_{uid}_{index}"
             bind_params: dict[str, str] = {
-                "property_path": property_path,
-                param_name: match_value.lower(),
+                pp_param: property_path,
+                mv_param: match_value.lower(),
             }
             if sub_path:
-                bind_params["sub_path"] = sub_path
+                bind_params[sp_param] = sub_path
             conditions.append(
                 text(
                     f"""EXISTS(SELECT 1 FROM json_each(
-                        json_extract("{table_name}".{column_name}, :property_path))
-                        WHERE {value_expression} = :{param_name})"""
+                        json_extract("{table_name}".{column_name}, :{pp_param}))
+                        WHERE {value_expression} = :{mv_param})"""
                 ).bindparams(**bind_params)
             )
         return and_(*conditions)
@@ -253,18 +256,21 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
                 property_expr = func.json_extract(json_column, path_to_array)
                 rows = session.query(property_expr).filter(property_expr.isnot(None)).distinct().all()
             else:
+                uid = self._uid()
+                pa_param = f"path_to_array_{uid}"
+                sp_param = f"sub_path_{uid}"
                 table_name = json_column.class_.__tablename__
                 column_name = json_column.key
                 rows = session.execute(
                     text(
-                        f"""SELECT DISTINCT json_extract(j.value, :sub_path) AS value
+                        f"""SELECT DISTINCT json_extract(j.value, :{sp_param}) AS value
                         FROM "{table_name}",
-                        json_each(json_extract("{table_name}".{column_name}, :path_to_array)) AS j
-                        WHERE json_extract(j.value, :sub_path) IS NOT NULL"""
-                    ).bindparams(
-                        path_to_array=path_to_array,
-                        sub_path=sub_path,
-                    )
+                        json_each(json_extract("{table_name}".{column_name}, :{pa_param})) AS j
+                        WHERE json_extract(j.value, :{sp_param}) IS NOT NULL"""
+                    ).bindparams(**{
+                        pa_param: path_to_array,
+                        sp_param: sub_path,
+                    })
                 ).fetchall()
         return sorted(row[0] for row in rows)
 

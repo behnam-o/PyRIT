@@ -313,16 +313,19 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         value_to_match: str,
         partial_match: bool = False,
     ) -> Any:
+        uid = self._uid()
         table_name = json_column.class_.__tablename__
         column_name = json_column.key
+        pp_param = f"pp_{uid}"
+        mv_param = f"mv_{uid}"
 
         return text(
             f"""ISJSON("{table_name}".{column_name}) = 1
-                AND LOWER(JSON_VALUE("{table_name}".{column_name}, :property_path)) {"LIKE" if partial_match else "="} :match_property_value"""  # noqa: E501
-        ).bindparams(
-            property_path=property_path,
-            match_property_value=f"%{value_to_match.lower()}%" if partial_match else value_to_match.lower(),
-        )
+                AND LOWER(JSON_VALUE("{table_name}".{column_name}, :{pp_param})) {"LIKE" if partial_match else "="} :{mv_param}"""  # noqa: E501
+        ).bindparams(**{
+            pp_param: property_path,
+            mv_param: f"%{value_to_match.lower()}%" if partial_match else value_to_match.lower(),
+        })
 
     def _get_condition_json_array_match(
         self,
@@ -332,30 +335,34 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         sub_path: str | None = None,
         array_to_match: Sequence[str],
     ) -> Any:
+        uid = self._uid()
         table_name = json_column.class_.__tablename__
         column_name = json_column.key
+        pp_param = f"pp_{uid}"
+        sp_param = f"sp_{uid}"
+
         if len(array_to_match) == 0:
             return text(
                 f"""("{table_name}".{column_name} IS NULL
-                OR JSON_QUERY("{table_name}".{column_name}, :property_path) IS NULL
-                OR JSON_QUERY("{table_name}".{column_name}, :property_path) = '[]')"""
-            ).bindparams(property_path=property_path)
+                OR JSON_QUERY("{table_name}".{column_name}, :{pp_param}) IS NULL
+                OR JSON_QUERY("{table_name}".{column_name}, :{pp_param}) = '[]')"""
+            ).bindparams(**{pp_param: property_path})
 
-        value_expression = "LOWER(JSON_VALUE(value, :sub_path))" if sub_path else "LOWER(value)"
+        value_expression = f"LOWER(JSON_VALUE(value, :{sp_param}))" if sub_path else "LOWER(value)"
 
         conditions = []
-        bindparams_dict: dict[str, str] = {"property_path": property_path}
+        bindparams_dict: dict[str, str] = {pp_param: property_path}
         if sub_path:
-            bindparams_dict["sub_path"] = sub_path
+            bindparams_dict[sp_param] = sub_path
 
         for index, match_value in enumerate(array_to_match):
-            param_name = f"match_value_{index}"
+            mv_param = f"mv_{uid}_{index}"
             conditions.append(
                 f"""EXISTS(SELECT 1 FROM OPENJSON(JSON_QUERY("{table_name}".{column_name},
-                    :property_path))
-                    WHERE {value_expression} = :{param_name})"""
+                    :{pp_param}))
+                    WHERE {value_expression} = :{mv_param})"""
             )
-            bindparams_dict[param_name] = match_value.lower()
+            bindparams_dict[mv_param] = match_value.lower()
 
         combined = " AND ".join(conditions)
         return text(f"""ISJSON("{table_name}".{column_name}) = 1 AND {combined}""").bindparams(**bindparams_dict)
@@ -367,30 +374,33 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         path_to_array: str,
         sub_path: str | None = None,
     ) -> list[str]:
+        uid = self._uid()
+        pa_param = f"pa_{uid}"
+        sp_param = f"sp_{uid}"
         table_name = json_column.class_.__tablename__
         column_name = json_column.key
         with closing(self.get_session()) as session:
             if sub_path is None:
                 rows = session.execute(
                     text(
-                        f"""SELECT DISTINCT JSON_VALUE("{table_name}".{column_name}, :path_to_array) AS value
+                        f"""SELECT DISTINCT JSON_VALUE("{table_name}".{column_name}, :{pa_param}) AS value
                         FROM "{table_name}"
                         WHERE ISJSON("{table_name}".{column_name}) = 1
-                        AND JSON_VALUE("{table_name}".{column_name}, :path_to_array) IS NOT NULL"""
-                    ).bindparams(path_to_array=path_to_array)
+                        AND JSON_VALUE("{table_name}".{column_name}, :{pa_param}) IS NOT NULL"""
+                    ).bindparams(**{pa_param: path_to_array})
                 ).fetchall()
             else:
                 rows = session.execute(
                     text(
-                        f"""SELECT DISTINCT JSON_VALUE(items.value, :sub_path) AS value
+                        f"""SELECT DISTINCT JSON_VALUE(items.value, :{sp_param}) AS value
                         FROM "{table_name}"
-                        CROSS APPLY OPENJSON(JSON_QUERY("{table_name}".{column_name}, :path_to_array)) AS items
+                        CROSS APPLY OPENJSON(JSON_QUERY("{table_name}".{column_name}, :{pa_param})) AS items
                         WHERE ISJSON("{table_name}".{column_name}) = 1
-                        AND JSON_VALUE(items.value, :sub_path) IS NOT NULL"""
-                    ).bindparams(
-                        path_to_array=path_to_array,
-                        sub_path=sub_path,
-                    )
+                        AND JSON_VALUE(items.value, :{sp_param}) IS NOT NULL"""
+                    ).bindparams(**{
+                        pa_param: path_to_array,
+                        sp_param: sub_path,
+                    })
                 ).fetchall()
         return sorted(row[0] for row in rows)
 
