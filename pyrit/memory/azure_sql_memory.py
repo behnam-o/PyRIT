@@ -321,7 +321,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
                 AND LOWER(JSON_VALUE("{table_name}".{column_name}, :property_path)) {"LIKE" if partial_match else "="} :match_property_value"""  # noqa: E501
         ).bindparams(
             property_path=property_path,
-            match_property_value=f"%{value_to_match.lower()}%",
+            match_property_value=f"%{value_to_match.lower()}%" if partial_match else value_to_match.lower(),
         )
 
     def _get_condition_json_array_match(

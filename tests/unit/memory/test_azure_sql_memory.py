@@ -326,6 +326,29 @@ def test_update_labels_by_conversation_id(memory_interface: AzureSQLMemory):
         assert updated_entry.labels["test1"] == "change"
 
 
+@pytest.mark.parametrize(
+    "partial_match, expected_value",
+    [
+        (False, "testvalue"),
+        (True, "%testvalue%"),
+    ],
+    ids=["exact_match", "partial_match"],
+)
+def test_get_condition_json_property_match_bind_params(
+    memory_interface: AzureSQLMemory, partial_match: bool, expected_value: str
+):
+    condition = memory_interface._get_condition_json_property_match(
+        json_column=PromptMemoryEntry.labels,
+        property_path="$.key",
+        value_to_match="TestValue",
+        partial_match=partial_match,
+    )
+    # Extract the compiled bind parameters
+    params = condition.compile().params
+    assert params["match_property_value"] == expected_value
+    assert params["property_path"] == "$.key"
+
+
 def test_update_prompt_metadata_by_conversation_id(memory_interface: AzureSQLMemory):
     # Insert a test entry
     entry = PromptMemoryEntry(
