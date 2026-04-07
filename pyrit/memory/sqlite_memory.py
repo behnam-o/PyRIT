@@ -197,11 +197,30 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         property_path: str,
         value_to_match: str,
         partial_match: bool = False,
+        case_sensitive: bool = False,
     ) -> Any:
-        extracted_value = func.lower(func.json_extract(json_column, property_path))
+        """
+        Return a SQLite DB condition for matching a value at a given path within a JSON object.
+
+        Args:
+            json_column (InstrumentedAttribute[Any]): The JSON-backed model field to query.
+            property_path (str): The JSON path for the property to match.
+            value_to_match (str): The string value that must match the extracted JSON property value.
+            partial_match (bool): Whether to perform a case-insensitive substring match.
+            case_sensitive (bool): Whether the match should be case-sensitive. Defaults to False.
+
+        Returns:
+            Any: A SQLAlchemy condition for the backend-specific JSON query.
+        """
+        raw = func.json_extract(json_column, property_path)
+        if case_sensitive:
+            extracted_value, target = raw, value_to_match
+        else:
+            extracted_value, target = func.lower(raw), value_to_match.lower()
+
         if partial_match:
-            return extracted_value.like(f"%{value_to_match.lower()}%")
-        return extracted_value == value_to_match.lower()
+            return extracted_value.like(f"%{target}%")
+        return extracted_value == target
 
     def _get_condition_json_array_match(
         self,
@@ -211,6 +230,20 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         sub_path: str | None = None,
         array_to_match: Sequence[str],
     ) -> Any:
+        """
+        Return a SQLite DB condition for matching an array at a given path within a JSON object.
+
+        Args:
+            json_column (InstrumentedAttribute[Any]): The JSON-backed SQLAlchemy field to query.
+            property_path (str): The JSON path for the target array.
+            sub_path (Optional[str]): An optional JSON path applied to each array item before matching.
+            array_to_match (Sequence[str]): The array that must match the extracted JSON array values.
+            For a match, ALL values in this array must be present in the JSON array.
+            If `array_to_match` is empty, the condition must match only if the target is also an empty array or None.
+
+        Returns:
+            Any: A database-specific SQLAlchemy condition.
+        """
         array_expr = func.json_extract(json_column, property_path)
         if len(array_to_match) == 0:
             return or_(
@@ -251,6 +284,22 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         path_to_array: str,
         sub_path: str | None = None,
     ) -> list[str]:
+        """
+        Return sorted unique values in an array located at a given path within a JSON object in a SQLite DB Column.
+
+        This method performs a database-level query to extract distinct values from a
+        an array within a JSON-type column. When ``sub_path`` is provided, the distinct values are
+        extracted from each array item using the sub-path.
+
+        Args:
+            json_column (Any): The JSON-backed model field to query.
+            path_to_array (str): The JSON path to the array whose unique values are extracted.
+            sub_path (str | None): Optional JSON path applied to each array
+                item before collecting distinct values.
+
+        Returns:
+            list[str]: A sorted list of unique values in the array.
+        """
         with closing(self.get_session()) as session:
             if sub_path is None:
                 property_expr = func.json_extract(json_column, path_to_array)

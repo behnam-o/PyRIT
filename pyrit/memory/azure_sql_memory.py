@@ -312,20 +312,39 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         property_path: str,
         value_to_match: str,
         partial_match: bool = False,
+        case_sensitive: bool = False,
     ) -> Any:
         uid = self._uid()
         table_name = json_column.class_.__tablename__
         column_name = json_column.key
         pp_param = f"pp_{uid}"
         mv_param = f"mv_{uid}"
+        """
+        Return an Azure SQL DB condition for matching a value at a given path within a JSON object.
+
+        Args:
+            json_column (InstrumentedAttribute[Any]): The JSON-backed model field to query.
+            property_path (str): The JSON path for the property to match.
+            value_to_match (str): The string value that must match the extracted JSON property value.
+            partial_match (bool): Whether to perform a case-insensitive substring match.
+            case_sensitive (bool): Whether the match should be case-sensitive. Defaults to False.
+
+        Returns:
+            Any: A SQLAlchemy condition for the backend-specific JSON query.
+        """
+        json_func = "JSON_VALUE" if case_sensitive else "LOWER(JSON_VALUE)"
+        operator = "LIKE" if partial_match else "="
+        target = value_to_match if case_sensitive else value_to_match.lower()
+        if partial_match:
+            target = f"%{target}%"
 
         return text(
             f"""ISJSON("{table_name}".{column_name}) = 1
-                AND LOWER(JSON_VALUE("{table_name}".{column_name}, :{pp_param})) {"LIKE" if partial_match else "="} :{mv_param}"""  # noqa: E501
+                AND {json_func}("{table_name}".{column_name}, :{pp_param}) {operator} :{mv_param}"""
         ).bindparams(
             **{
                 pp_param: property_path,
-                mv_param: f"%{value_to_match.lower()}%" if partial_match else value_to_match.lower(),
+                mv_param: target,
             }
         )
 
@@ -337,6 +356,20 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         sub_path: str | None = None,
         array_to_match: Sequence[str],
     ) -> Any:
+        """
+        Return an Azure SQL DB condition for matching an array at a given path within a JSON object.
+
+        Args:
+            json_column (InstrumentedAttribute[Any]): The JSON-backed SQLAlchemy field to query.
+            property_path (str): The JSON path for the target array.
+            sub_path (Optional[str]): An optional JSON path applied to each array item before matching.
+            array_to_match (Sequence[str]): The array that must match the extracted JSON array values.
+            For a match, ALL values in this array must be present in the JSON array.
+            If `array_to_match` is empty, the condition must match only if the target is also an empty array or None.
+
+        Returns:
+            Any: A database-specific SQLAlchemy condition.
+        """
         uid = self._uid()
         table_name = json_column.class_.__tablename__
         column_name = json_column.key
@@ -376,6 +409,22 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         path_to_array: str,
         sub_path: str | None = None,
     ) -> list[str]:
+        """
+        Return sorted unique values in an array located at a given path within a JSON object in an Azure SQL DB Column.
+
+        This method performs a database-level query to extract distinct values from a
+        an array within a JSON-type column. When ``sub_path`` is provided, the distinct values are
+        extracted from each array item using the sub-path.
+
+        Args:
+            json_column (Any): The JSON-backed model field to query.
+            path_to_array (str): The JSON path to the array whose unique values are extracted.
+            sub_path (str | None): Optional JSON path applied to each array
+                item before collecting distinct values.
+
+        Returns:
+            list[str]: A sorted list of unique values in the array.
+        """
         uid = self._uid()
         pa_param = f"pa_{uid}"
         sp_param = f"sp_{uid}"
@@ -580,6 +629,8 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         """
         Insert a list of message pieces into the memory storage.
 
+        Args:
+            message_pieces (Sequence[MessagePiece]): A sequence of MessagePiece instances to be added.
         """
         self._insert_entries(entries=[PromptMemoryEntry(entry=piece) for piece in message_pieces])
 

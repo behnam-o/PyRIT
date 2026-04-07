@@ -9,7 +9,7 @@ from pyrit.common.utils import to_sha256
 from pyrit.identifiers import ComponentIdentifier
 from pyrit.identifiers.atomic_attack_identifier import build_atomic_attack_identifier
 from pyrit.memory import MemoryInterface
-from pyrit.memory.identifier_filters import IdentifierFilter
+from pyrit.memory.identifier_filters import IdentifierFilter, IdentifierType
 from pyrit.memory.memory_models import AttackResultEntry
 from pyrit.models import (
     AttackOutcome,
@@ -1176,6 +1176,15 @@ def test_get_attack_results_by_attack_class_no_match(sqlite_instance: MemoryInte
     assert len(results) == 0
 
 
+def test_get_attack_results_by_attack_class_case_sensitive(sqlite_instance: MemoryInterface):
+    """Test that attack_class filter is case-sensitive (exact match)."""
+    ar1 = _make_attack_result_with_identifier("conv_1", "CrescendoAttack")
+    sqlite_instance.add_attack_results_to_memory(attack_results=[ar1])
+
+    results = sqlite_instance.get_attack_results(attack_class="crescendoattack")
+    assert len(results) == 0
+
+
 def test_get_attack_results_by_attack_class_no_identifier(sqlite_instance: MemoryInterface):
     """Test that attacks with no attack_identifier (empty JSON) are excluded by attack_class filter."""
     ar1 = create_attack_result("conv_1", 1)  # No attack_identifier → stored as {}
@@ -1354,11 +1363,15 @@ def test_get_attack_results_by_attack_identifier_filter_hash(sqlite_instance: Me
 
     # Filter by hash of ar1's attack identifier
     results = sqlite_instance.get_attack_results(
-        attack_identifier_filter=IdentifierFilter(
-            property_path="$.hash",
-            value_to_match=ar1.atomic_attack_identifier.hash,
-            partial_match=False,
-        ),
+        identifier_filters={
+            IdentifierFilter(
+                identifier_type=IdentifierType.ATTACK,
+                property_path="$.hash",
+                sub_path=None,
+                value_to_match=ar1.atomic_attack_identifier.hash,
+                partial_match=False,
+            )
+        },
     )
     assert len(results) == 1
     assert results[0].conversation_id == "conv_1"
@@ -1373,11 +1386,15 @@ def test_get_attack_results_by_attack_identifier_filter_class_name(sqlite_instan
 
     # Filter by partial attack class name
     results = sqlite_instance.get_attack_results(
-        attack_identifier_filter=IdentifierFilter(
-            property_path="$.children.attack.class_name",
-            value_to_match="Crescendo",
-            partial_match=True,
-        ),
+        identifier_filters={
+            IdentifierFilter(
+                identifier_type=IdentifierType.ATTACK,
+                property_path="$.children.attack.class_name",
+                sub_path=None,
+                value_to_match="Crescendo",
+                partial_match=True,
+            )
+        },
     )
     assert len(results) == 2
     assert {r.conversation_id for r in results} == {"conv_1", "conv_3"}
@@ -1389,10 +1406,14 @@ def test_get_attack_results_by_attack_identifier_filter_no_match(sqlite_instance
     sqlite_instance.add_attack_results_to_memory(attack_results=[ar1])
 
     results = sqlite_instance.get_attack_results(
-        attack_identifier_filter=IdentifierFilter(
-            property_path="$.hash",
-            value_to_match="nonexistent_hash",
-            partial_match=False,
-        ),
+        identifier_filters={
+            IdentifierFilter(
+                identifier_type=IdentifierType.ATTACK,
+                property_path="$.hash",
+                sub_path=None,
+                value_to_match="nonexistent_hash",
+                partial_match=False,
+            )
+        },
     )
     assert len(results) == 0

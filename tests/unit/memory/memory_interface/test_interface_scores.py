@@ -13,7 +13,7 @@ from unit.mocks import get_mock_target
 from pyrit.executor.attack.single_turn.prompt_sending import PromptSendingAttack
 from pyrit.identifiers import ComponentIdentifier
 from pyrit.memory import MemoryInterface, PromptMemoryEntry
-from pyrit.memory.identifier_filters import IdentifierFilter
+from pyrit.memory.identifier_filters import IdentifierFilter, IdentifierType
 from pyrit.models import (
     MessagePiece,
     Score,
@@ -262,43 +262,59 @@ def test_get_scores_by_scorer_identifier_filter(
 
     # Filter by exact class_name match
     results = sqlite_instance.get_scores(
-        scorer_identifier_filter=IdentifierFilter(
-            property_path="$.class_name",
-            value_to_match="ScorerAlpha",
-            partial_match=False,
-        ),
+        identifier_filters={
+            IdentifierFilter(
+                identifier_type=IdentifierType.SCORER,
+                property_path="$.class_name",
+                sub_path=None,
+                value_to_match="ScorerAlpha",
+                partial_match=False,
+            )
+        },
     )
     assert len(results) == 1
     assert results[0].score_value == "0.9"
 
     # Filter by partial class_name match
     results = sqlite_instance.get_scores(
-        scorer_identifier_filter=IdentifierFilter(
-            property_path="$.class_name",
-            value_to_match="Scorer",
-            partial_match=True,
-        ),
+        identifier_filters={
+            IdentifierFilter(
+                identifier_type=IdentifierType.SCORER,
+                property_path="$.class_name",
+                sub_path=None,
+                value_to_match="Scorer",
+                partial_match=True,
+            )
+        },
     )
     assert len(results) == 2
 
     # Filter by hash
     scorer_hash = score_a.scorer_class_identifier.hash
     results = sqlite_instance.get_scores(
-        scorer_identifier_filter=IdentifierFilter(
-            property_path="$.hash",
-            value_to_match=scorer_hash,
-            partial_match=False,
-        ),
+        identifier_filters={
+            IdentifierFilter(
+                identifier_type=IdentifierType.SCORER,
+                property_path="$.hash",
+                sub_path=None,
+                value_to_match=scorer_hash,
+                partial_match=False,
+            )
+        },
     )
     assert len(results) == 1
     assert results[0].score_value == "0.9"
 
     # No match
     results = sqlite_instance.get_scores(
-        scorer_identifier_filter=IdentifierFilter(
-            property_path="$.class_name",
-            value_to_match="NonExistent",
-            partial_match=False,
-        ),
+        identifier_filters={
+            IdentifierFilter(
+                identifier_type=IdentifierType.SCORER,
+                property_path="$.class_name",
+                sub_path=None,
+                value_to_match="NonExistent",
+                partial_match=False,
+            )
+        },
     )
     assert len(results) == 0

@@ -14,7 +14,7 @@ from unit.mocks import get_mock_target
 from pyrit.executor.attack.single_turn.prompt_sending import PromptSendingAttack
 from pyrit.identifiers import ComponentIdentifier
 from pyrit.memory import MemoryInterface, PromptMemoryEntry
-from pyrit.memory.identifier_filters import IdentifierFilter
+from pyrit.memory.identifier_filters import IdentifierFilter, IdentifierType
 from pyrit.models import (
     Message,
     MessagePiece,
@@ -1276,22 +1276,30 @@ def test_get_message_pieces_by_attack_identifier_filter(sqlite_instance: MemoryI
 
     # Filter by exact attack hash
     results = sqlite_instance.get_message_pieces(
-        attack_identifier_filter=IdentifierFilter(
-            property_path="$.hash",
-            value_to_match=attack1.get_identifier().hash,
-            partial_match=False,
-        ),
+        identifier_filters={
+            IdentifierFilter(
+                identifier_type=IdentifierType.ATTACK,
+                property_path="$.hash",
+                sub_path=None,
+                value_to_match=attack1.get_identifier().hash,
+                partial_match=False,
+            )
+        },
     )
     assert len(results) == 1
     assert results[0].original_value == "Hello 1"
 
     # No match
     results = sqlite_instance.get_message_pieces(
-        attack_identifier_filter=IdentifierFilter(
-            property_path="$.hash",
-            value_to_match="nonexistent_hash",
-            partial_match=False,
-        ),
+        identifier_filters={
+            IdentifierFilter(
+                identifier_type=IdentifierType.ATTACK,
+                property_path="$.hash",
+                sub_path=None,
+                value_to_match="nonexistent_hash",
+                partial_match=False,
+            )
+        },
     )
     assert len(results) == 0
 
@@ -1329,32 +1337,122 @@ def test_get_message_pieces_by_target_identifier_filter(sqlite_instance: MemoryI
 
     # Filter by target hash
     results = sqlite_instance.get_message_pieces(
-        prompt_target_identifier_filter=IdentifierFilter(
-            property_path="$.hash",
-            value_to_match=target_id_1.hash,
-            partial_match=False,
-        ),
+        identifier_filters={
+            IdentifierFilter(
+                identifier_type=IdentifierType.TARGET,
+                property_path="$.hash",
+                sub_path=None,
+                value_to_match=target_id_1.hash,
+                partial_match=False,
+            )
+        },
     )
     assert len(results) == 1
     assert results[0].original_value == "Hello OpenAI"
 
     # Filter by endpoint partial match
     results = sqlite_instance.get_message_pieces(
-        prompt_target_identifier_filter=IdentifierFilter(
-            property_path="$.endpoint",
-            value_to_match="openai",
-            partial_match=True,
-        ),
+        identifier_filters={
+            IdentifierFilter(
+                identifier_type=IdentifierType.TARGET,
+                property_path="$.endpoint",
+                sub_path=None,
+                value_to_match="openai",
+                partial_match=True,
+            )
+        },
     )
     assert len(results) == 1
     assert results[0].original_value == "Hello OpenAI"
 
     # No match
     results = sqlite_instance.get_message_pieces(
-        prompt_target_identifier_filter=IdentifierFilter(
-            property_path="$.hash",
-            value_to_match="nonexistent",
-            partial_match=False,
+        identifier_filters={
+            IdentifierFilter(
+                identifier_type=IdentifierType.TARGET,
+                property_path="$.hash",
+                sub_path=None,
+                value_to_match="nonexistent",
+                partial_match=False,
+            )
+        },
+    )
+    assert len(results) == 0
+
+
+def test_get_message_pieces_by_converter_identifier_filter_with_sub_path(sqlite_instance: MemoryInterface):
+    converter_a = ComponentIdentifier(
+        class_name="Base64Converter",
+        class_module="pyrit.prompt_converter",
+    )
+    converter_b = ComponentIdentifier(
+        class_name="ROT13Converter",
+        class_module="pyrit.prompt_converter",
+    )
+
+    entries = [
+        PromptMemoryEntry(
+            entry=MessagePiece(
+                role="user",
+                original_value="With Base64",
+                converter_identifiers=[converter_a],
+            )
         ),
+        PromptMemoryEntry(
+            entry=MessagePiece(
+                role="user",
+                original_value="With both converters",
+                converter_identifiers=[converter_a, converter_b],
+            )
+        ),
+        PromptMemoryEntry(
+            entry=MessagePiece(
+                role="user",
+                original_value="No converters",
+            )
+        ),
+    ]
+
+    sqlite_instance._insert_entries(entries=entries)
+
+    # Filter by converter class_name using sub_path (array element matching)
+    results = sqlite_instance.get_message_pieces(
+        identifier_filters={
+            IdentifierFilter(
+                identifier_type=IdentifierType.CONVERTER,
+                property_path="$",
+                sub_path="$.class_name",
+                value_to_match="Base64Converter",
+            )
+        },
+    )
+    assert len(results) == 2
+    original_values = {r.original_value for r in results}
+    assert original_values == {"With Base64", "With both converters"}
+
+    # Filter by ROT13Converter — only the entry with both converters
+    results = sqlite_instance.get_message_pieces(
+        identifier_filters={
+            IdentifierFilter(
+                identifier_type=IdentifierType.CONVERTER,
+                property_path="$",
+                sub_path="$.class_name",
+                value_to_match="ROT13Converter",
+            )
+        },
+    )
+    assert len(results) == 1
+    assert results[0].original_value == "With both converters"
+
+    # No match
+    results = sqlite_instance.get_message_pieces(
+        identifier_filters={
+            IdentifierFilter(
+                identifier_type=IdentifierType.CONVERTER,
+                property_path="$",
+                sub_path="$.class_name",
+                value_to_match="NonexistentConverter",
+            )
+        },
     )
     assert len(results) == 0
