@@ -2,8 +2,7 @@
 # Licensed under the MIT license.
 
 from dataclasses import dataclass
-
-from prometheus_client import Enum
+from enum import Enum
 
 
 class IdentifierType(Enum):
