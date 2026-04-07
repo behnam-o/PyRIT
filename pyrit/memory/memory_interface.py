@@ -119,7 +119,7 @@ class MemoryInterface(abc.ABC):
         """
         self.memory_embedding = None
 
-    def _get_identifier_property_match_condition(
+    def _get_condition_identifier_property_match(
         self, identifier_column: Any, identifier_filter: IdentifierFilter
     ) -> Any:
         """
@@ -139,6 +139,7 @@ class MemoryInterface(abc.ABC):
             sub_path=identifier_filter.sub_path,
             value_to_match=identifier_filter.value_to_match,
             partial_match=identifier_filter.partial_match,
+            case_sensitive=identifier_filter.case_sensitive,
         )
 
     def _get_condition_json_match(
@@ -550,7 +551,7 @@ class MemoryInterface(abc.ABC):
 
                 if column is not None:
                     conditions.append(
-                        self._get_identifier_property_match_condition(
+                        self._get_condition_identifier_property_match(
                             identifier_column=column,
                             identifier_filter=identifier_filter,
                         )
@@ -766,7 +767,7 @@ class MemoryInterface(abc.ABC):
 
                 if column is not None:
                     conditions.append(
-                        self._get_identifier_property_match_condition(
+                        self._get_condition_identifier_property_match(
                             identifier_column=column,
                             identifier_filter=identifier_filter,
                         )
@@ -1592,7 +1593,7 @@ class MemoryInterface(abc.ABC):
 
                 if column is not None:
                     conditions.append(
-                        self._get_identifier_property_match_condition(
+                        self._get_condition_identifier_property_match(
                             identifier_column=column,
                             identifier_filter=identifier_filter,
                         )
@@ -1873,7 +1874,7 @@ class MemoryInterface(abc.ABC):
 
                 if column is not None:
                     conditions.append(
-                        self._get_identifier_property_match_condition(
+                        self._get_condition_identifier_property_match(
                             identifier_column=column,
                             identifier_filter=identifier_filter,
                         )
