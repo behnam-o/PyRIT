@@ -44,13 +44,13 @@ def test_identifier_filter_valid_with_sub_path():
 
 
 def test_build_identifier_filter_conditions_unsupported_type_raises(sqlite_instance: MemoryInterface):
-    filters = {
+    filters = [
         IdentifierFilter(
             identifier_type=IdentifierType.SCORER,
             property_path="$.class_name",
             value_to_match="MyScorer",
         )
-    }
+    ]
     with pytest.raises(ValueError, match="does not support identifier type"):
         sqlite_instance._build_identifier_filter_conditions(
             identifier_filters=filters,
