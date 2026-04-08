@@ -1276,28 +1276,28 @@ def test_get_message_pieces_by_attack_identifier_filter(sqlite_instance: MemoryI
 
     # Filter by exact attack hash
     results = sqlite_instance.get_message_pieces(
-        identifier_filters={
+        identifier_filters=[
             IdentifierFilter(
                 identifier_type=IdentifierType.ATTACK,
                 property_path="$.hash",
                 value_to_match=attack1.get_identifier().hash,
                 partial_match=False,
             )
-        },
+        ],
     )
     assert len(results) == 1
     assert results[0].original_value == "Hello 1"
 
     # No match
     results = sqlite_instance.get_message_pieces(
-        identifier_filters={
+        identifier_filters=[
             IdentifierFilter(
                 identifier_type=IdentifierType.ATTACK,
                 property_path="$.hash",
                 value_to_match="nonexistent_hash",
                 partial_match=False,
             )
-        },
+        ],
     )
     assert len(results) == 0
 
@@ -1335,42 +1335,42 @@ def test_get_message_pieces_by_target_identifier_filter(sqlite_instance: MemoryI
 
     # Filter by target hash
     results = sqlite_instance.get_message_pieces(
-        identifier_filters={
+        identifier_filters=[
             IdentifierFilter(
                 identifier_type=IdentifierType.TARGET,
                 property_path="$.hash",
                 value_to_match=target_id_1.hash,
                 partial_match=False,
             )
-        },
+        ],
     )
     assert len(results) == 1
     assert results[0].original_value == "Hello OpenAI"
 
     # Filter by endpoint partial match
     results = sqlite_instance.get_message_pieces(
-        identifier_filters={
+        identifier_filters=[
             IdentifierFilter(
                 identifier_type=IdentifierType.TARGET,
                 property_path="$.endpoint",
                 value_to_match="openai",
                 partial_match=True,
             )
-        },
+        ],
     )
     assert len(results) == 1
     assert results[0].original_value == "Hello OpenAI"
 
     # No match
     results = sqlite_instance.get_message_pieces(
-        identifier_filters={
+        identifier_filters=[
             IdentifierFilter(
                 identifier_type=IdentifierType.TARGET,
                 property_path="$.hash",
                 value_to_match="nonexistent",
                 partial_match=False,
             )
-        },
+        ],
     )
     assert len(results) == 0
 
@@ -1412,14 +1412,14 @@ def test_get_message_pieces_by_converter_identifier_filter_with_sub_path(sqlite_
 
     # Filter by converter class_name using sub_path (array element matching)
     results = sqlite_instance.get_message_pieces(
-        identifier_filters={
+        identifier_filters=[
             IdentifierFilter(
                 identifier_type=IdentifierType.CONVERTER,
                 property_path="$",
                 sub_path="$.class_name",
                 value_to_match="Base64Converter",
             )
-        },
+        ],
     )
     assert len(results) == 2
     original_values = {r.original_value for r in results}
@@ -1427,27 +1427,27 @@ def test_get_message_pieces_by_converter_identifier_filter_with_sub_path(sqlite_
 
     # Filter by ROT13Converter — only the entry with both converters
     results = sqlite_instance.get_message_pieces(
-        identifier_filters={
+        identifier_filters=[
             IdentifierFilter(
                 identifier_type=IdentifierType.CONVERTER,
                 property_path="$",
                 sub_path="$.class_name",
                 value_to_match="ROT13Converter",
             )
-        },
+        ],
     )
     assert len(results) == 1
     assert results[0].original_value == "With both converters"
 
     # No match
     results = sqlite_instance.get_message_pieces(
-        identifier_filters={
+        identifier_filters=[
             IdentifierFilter(
                 identifier_type=IdentifierType.CONVERTER,
                 property_path="$",
                 sub_path="$.class_name",
                 value_to_match="NonexistentConverter",
             )
-        },
+        ],
     )
     assert len(results) == 0

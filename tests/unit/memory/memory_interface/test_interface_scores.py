@@ -262,55 +262,55 @@ def test_get_scores_by_scorer_identifier_filter(
 
     # Filter by exact class_name match
     results = sqlite_instance.get_scores(
-        identifier_filters={
+        identifier_filters=[
             IdentifierFilter(
                 identifier_type=IdentifierType.SCORER,
                 property_path="$.class_name",
                 value_to_match="ScorerAlpha",
                 partial_match=False,
             )
-        },
+        ],
     )
     assert len(results) == 1
     assert results[0].score_value == "0.9"
 
     # Filter by partial class_name match
     results = sqlite_instance.get_scores(
-        identifier_filters={
+        identifier_filters=[
             IdentifierFilter(
                 identifier_type=IdentifierType.SCORER,
                 property_path="$.class_name",
                 value_to_match="Scorer",
                 partial_match=True,
             )
-        },
+        ],
     )
     assert len(results) == 2
 
     # Filter by hash
     scorer_hash = score_a.scorer_class_identifier.hash
     results = sqlite_instance.get_scores(
-        identifier_filters={
+        identifier_filters=[
             IdentifierFilter(
                 identifier_type=IdentifierType.SCORER,
                 property_path="$.hash",
                 value_to_match=scorer_hash,
                 partial_match=False,
             )
-        },
+        ],
     )
     assert len(results) == 1
     assert results[0].score_value == "0.9"
 
     # No match
     results = sqlite_instance.get_scores(
-        identifier_filters={
+        identifier_filters=[
             IdentifierFilter(
                 identifier_type=IdentifierType.SCORER,
                 property_path="$.class_name",
                 value_to_match="NonExistent",
                 partial_match=False,
             )
-        },
+        ],
     )
     assert len(results) == 0

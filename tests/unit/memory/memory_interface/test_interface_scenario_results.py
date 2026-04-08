@@ -681,14 +681,14 @@ def test_get_scenario_results_by_target_identifier_filter_hash(sqlite_instance: 
 
     # Filter by target hash
     results = sqlite_instance.get_scenario_results(
-        identifier_filters={
+        identifier_filters=[
             IdentifierFilter(
                 identifier_type=IdentifierType.TARGET,
                 property_path="$.hash",
                 value_to_match=target_id_1.hash,
                 partial_match=False,
             )
-        },
+        ],
     )
     assert len(results) == 1
     assert results[0].scenario_identifier.name == "Scenario OpenAI"
@@ -727,14 +727,14 @@ def test_get_scenario_results_by_target_identifier_filter_endpoint(sqlite_instan
 
     # Filter by endpoint partial match
     results = sqlite_instance.get_scenario_results(
-        identifier_filters={
+        identifier_filters=[
             IdentifierFilter(
                 identifier_type=IdentifierType.TARGET,
                 property_path="$.endpoint",
                 value_to_match="openai",
                 partial_match=True,
             )
-        },
+        ],
     )
     assert len(results) == 1
     assert results[0].scenario_identifier.name == "Scenario OpenAI"
@@ -758,13 +758,13 @@ def test_get_scenario_results_by_target_identifier_filter_no_match(sqlite_instan
     sqlite_instance.add_scenario_results_to_memory(scenario_results=[scenario1])
 
     results = sqlite_instance.get_scenario_results(
-        identifier_filters={
+        identifier_filters=[
             IdentifierFilter(
                 identifier_type=IdentifierType.TARGET,
                 property_path="$.hash",
                 value_to_match="nonexistent_hash",
                 partial_match=False,
             )
-        },
+        ],
     )
     assert len(results) == 0
