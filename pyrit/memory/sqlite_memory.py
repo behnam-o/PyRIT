@@ -206,7 +206,7 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
             json_column (InstrumentedAttribute[Any]): The JSON-backed model field to query.
             property_path (str): The JSON path for the property to match.
             value_to_match (str): The string value that must match the extracted JSON property value.
-            partial_match (bool): Whether to perform a case-insensitive substring match.
+            partial_match (bool): Whether to perform a substring match.
             case_sensitive (bool): Whether the match should be case-sensitive. Defaults to False.
 
         Returns:
@@ -219,7 +219,8 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
             extracted_value, target = func.lower(raw), value_to_match.lower()
 
         if partial_match:
-            return extracted_value.like(f"%{target}%")
+            escaped = target.replace("%", "\\%").replace("_", "\\_")
+            return extracted_value.like(f"%{escaped}%", escape="\\")
         return extracted_value == target
 
     def _get_condition_json_array_match(

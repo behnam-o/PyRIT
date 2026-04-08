@@ -321,7 +321,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
             json_column (InstrumentedAttribute[Any]): The JSON-backed model field to query.
             property_path (str): The JSON path for the property to match.
             value_to_match (str): The string value that must match the extracted JSON property value.
-            partial_match (bool): Whether to perform a case-insensitive substring match.
+            partial_match (bool): Whether to perform a substring match.
             case_sensitive (bool): Whether the match should be case-sensitive. Defaults to False.
 
         Returns:
@@ -336,7 +336,8 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         operator = "LIKE" if partial_match else "="
         target = value_to_match if case_sensitive else value_to_match.lower()
         if partial_match:
-            target = f"%{target}%"
+            escaped = target.replace("%", "\\%").replace("_", "\\_")
+            target = f"%{escaped}%"
 
         return text(
             f"""ISJSON("{table_name}".{column_name}) = 1
@@ -633,27 +634,6 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
             message_pieces (Sequence[MessagePiece]): A sequence of MessagePiece instances to be added.
         """
         self._insert_entries(entries=[PromptMemoryEntry(entry=piece) for piece in message_pieces])
-
-    def get_unique_attack_class_names(self) -> list[str]:
-        """
-        Azure SQL implementation: extract unique class_name values from
-        the atomic_attack_identifier JSON column.
-
-        Returns:
-            Sorted list of unique attack class name strings.
-        """
-        return super().get_unique_attack_class_names()
-
-    def get_unique_converter_class_names(self) -> list[str]:
-        """
-        Azure SQL implementation: extract unique converter class_name values
-        from the children.attack.children.request_converters array
-        in the atomic_attack_identifier JSON column.
-
-        Returns:
-            Sorted list of unique converter class name strings.
-        """
-        return super().get_unique_converter_class_names()
 
     def dispose_engine(self) -> None:
         """

@@ -202,12 +202,17 @@ class MemoryInterface(abc.ABC):
                 and the condition should resolve if any element in that array matches the value.
                 Cannot be used with partial_match.
             value_to_match (str): The string value that must match the extracted JSON property value.
-            partial_match (bool): Whether to perform a case-insensitive substring match.
+            partial_match (bool): Whether to perform a substring match.
             case_sensitive (bool): Whether the match should be case-sensitive. Defaults to False.
 
         Returns:
             Any: A SQLAlchemy condition for the backend-specific JSON query.
+
+        Raises:
+            ValueError: If sub_path is provided together with partial_match or case_sensitive
         """
+        if sub_path and (partial_match or case_sensitive):
+            raise ValueError("sub_path cannot be combined with partial_match or case_sensitive")
         if sub_path:
             return self._get_condition_json_array_match(
                 json_column=json_column,
