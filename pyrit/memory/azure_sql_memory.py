@@ -404,61 +404,6 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         combined = " AND ".join(conditions)
         return text(f"""ISJSON("{table_name}".{column_name}) = 1 AND {combined}""").bindparams(**bindparams_dict)
 
-    def _get_unique_json_array_values(
-        self,
-        *,
-        json_column: Any,
-        path_to_array: str,
-        sub_path: str | None = None,
-    ) -> list[str]:
-        """
-        Return sorted unique values in an array located at a given path within a JSON object in an Azure SQL DB Column.
-
-        This method performs a database-level query to extract distinct values from a
-        an array within a JSON-type column. When ``sub_path`` is provided, the distinct values are
-        extracted from each array item using the sub-path.
-
-        Args:
-            json_column (Any): The JSON-backed model field to query.
-            path_to_array (str): The JSON path to the array whose unique values are extracted.
-            sub_path (str | None): Optional JSON path applied to each array
-                item before collecting distinct values.
-
-        Returns:
-            list[str]: A sorted list of unique values in the array.
-        """
-        uid = self._uid()
-        pa_param = f"pa_{uid}"
-        sp_param = f"sp_{uid}"
-        table_name = json_column.class_.__tablename__
-        column_name = json_column.key
-        with closing(self.get_session()) as session:
-            if sub_path is None:
-                rows = session.execute(
-                    text(
-                        f"""SELECT DISTINCT JSON_VALUE("{table_name}".{column_name}, :{pa_param}) AS value
-                        FROM "{table_name}"
-                        WHERE ISJSON("{table_name}".{column_name}) = 1
-                        AND JSON_VALUE("{table_name}".{column_name}, :{pa_param}) IS NOT NULL"""
-                    ).bindparams(**{pa_param: path_to_array})
-                ).fetchall()
-            else:
-                rows = session.execute(
-                    text(
-                        f"""SELECT DISTINCT JSON_VALUE(items.value, :{sp_param}) AS value
-                        FROM "{table_name}"
-                        CROSS APPLY OPENJSON(JSON_QUERY("{table_name}".{column_name}, :{pa_param})) AS items
-                        WHERE ISJSON("{table_name}".{column_name}) = 1
-                        AND JSON_VALUE(items.value, :{sp_param}) IS NOT NULL"""
-                    ).bindparams(
-                        **{
-                            pa_param: path_to_array,
-                            sp_param: sub_path,
-                        }
-                    )
-                ).fetchall()
-        return sorted(row[0] for row in rows)
-
     def _get_attack_result_harm_category_condition(self, *, targeted_harm_categories: Sequence[str]) -> Any:
         """
         Get the SQL Azure implementation for filtering AttackResults by targeted harm categories.
@@ -525,6 +470,49 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
                 text(f"ISJSON(labels) = 1 AND {combined_conditions}").bindparams(**bindparams_dict),
             )
         )
+
+    def get_unique_attack_class_names(self) -> list[str]:
+        """
+        Azure SQL implementation: extract unique class_name values from
+        the atomic_attack_identifier JSON column.
+
+        Returns:
+            Sorted list of unique attack class name strings.
+        """
+        with closing(self.get_session()) as session:
+            rows = session.execute(
+                text(
+                    """SELECT DISTINCT JSON_VALUE(atomic_attack_identifier,
+                        '$.children.attack.class_name') AS cls
+                    FROM "AttackResultEntries"
+                    WHERE ISJSON(atomic_attack_identifier) = 1
+                    AND JSON_VALUE(atomic_attack_identifier,
+                        '$.children.attack.class_name') IS NOT NULL"""
+                )
+            ).fetchall()
+        return sorted(row[0] for row in rows)
+
+    def get_unique_converter_class_names(self) -> list[str]:
+        """
+        Azure SQL implementation: extract unique converter class_name values
+        from the children.attack.children.request_converters array
+        in the atomic_attack_identifier JSON column.
+
+        Returns:
+            Sorted list of unique converter class name strings.
+        """
+        with closing(self.get_session()) as session:
+            rows = session.execute(
+                text(
+                    """SELECT DISTINCT JSON_VALUE(c.value, '$.class_name') AS cls
+                    FROM "AttackResultEntries"
+                    CROSS APPLY OPENJSON(JSON_QUERY(atomic_attack_identifier,
+                        '$.children.attack.children.request_converters')) AS c
+                    WHERE ISJSON(atomic_attack_identifier) = 1
+                    AND JSON_VALUE(c.value, '$.class_name') IS NOT NULL"""
+                )
+            ).fetchall()
+        return sorted(row[0] for row in rows)
 
     def get_conversation_stats(self, *, conversation_ids: Sequence[str]) -> dict[str, ConversationStats]:
         """

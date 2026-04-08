@@ -258,31 +258,6 @@ class MemoryInterface(abc.ABC):
         """
 
     @abc.abstractmethod
-    def _get_unique_json_array_values(
-        self,
-        *,
-        json_column: Any,
-        path_to_array: str,
-        sub_path: str | None = None,
-    ) -> list[str]:
-        """
-        Return sorted unique values in an array located at a given path within a JSON object.
-
-        This method performs a database-level query to extract distinct values from a
-        an array within a JSON-type column. When ``sub_path`` is provided, the distinct values are
-        extracted from each array item using the sub-path.
-
-        Args:
-            json_column (Any): The JSON-backed model field to query.
-            path_to_array (str): The JSON path to the array whose unique values are extracted.
-            sub_path (str | None): Optional JSON path applied to each array
-                item before collecting distinct values.
-
-        Returns:
-            list[str]: A sorted list of unique values in the array.
-        """
-
-    @abc.abstractmethod
     def get_all_embeddings(self) -> Sequence[EmbeddingDataEntry]:
         """
         Load all EmbeddingData from the memory storage handler.
@@ -452,6 +427,7 @@ class MemoryInterface(abc.ABC):
             Database-specific SQLAlchemy condition.
         """
 
+    @abc.abstractmethod
     def get_unique_attack_class_names(self) -> list[str]:
         """
         Return sorted unique attack class names from all stored attack results.
@@ -462,11 +438,8 @@ class MemoryInterface(abc.ABC):
         Returns:
             Sorted list of unique attack class name strings.
         """
-        return self._get_unique_json_array_values(
-            json_column=AttackResultEntry.atomic_attack_identifier,
-            path_to_array="$.children.attack.class_name",
-        )
 
+    @abc.abstractmethod
     def get_unique_converter_class_names(self) -> list[str]:
         """
         Return sorted unique converter class names used across all attack results.
@@ -477,11 +450,6 @@ class MemoryInterface(abc.ABC):
         Returns:
             Sorted list of unique converter class name strings.
         """
-        return self._get_unique_json_array_values(
-            json_column=AttackResultEntry.atomic_attack_identifier,
-            path_to_array="$.children.attack.children.request_converters",
-            sub_path="$.class_name",
-        )
 
     @abc.abstractmethod
     def get_conversation_stats(self, *, conversation_ids: Sequence[str]) -> dict[str, "ConversationStats"]:

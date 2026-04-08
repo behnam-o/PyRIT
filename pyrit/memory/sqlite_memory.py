@@ -277,54 +277,6 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         combined = " AND ".join(conditions)
         return text(combined).bindparams(**bindparams_dict)
 
-    def _get_unique_json_array_values(
-        self,
-        *,
-        json_column: Any,
-        path_to_array: str,
-        sub_path: str | None = None,
-    ) -> list[str]:
-        """
-        Return sorted unique values in an array located at a given path within a JSON object in a SQLite DB Column.
-
-        This method performs a database-level query to extract distinct values from a
-        an array within a JSON-type column. When ``sub_path`` is provided, the distinct values are
-        extracted from each array item using the sub-path.
-
-        Args:
-            json_column (Any): The JSON-backed model field to query.
-            path_to_array (str): The JSON path to the array whose unique values are extracted.
-            sub_path (str | None): Optional JSON path applied to each array
-                item before collecting distinct values.
-
-        Returns:
-            list[str]: A sorted list of unique values in the array.
-        """
-        with closing(self.get_session()) as session:
-            if sub_path is None:
-                property_expr = func.json_extract(json_column, path_to_array)
-                rows = session.query(property_expr).filter(property_expr.isnot(None)).distinct().all()
-            else:
-                uid = self._uid()
-                pa_param = f"path_to_array_{uid}"
-                sp_param = f"sub_path_{uid}"
-                table_name = json_column.class_.__tablename__
-                column_name = json_column.key
-                rows = session.execute(
-                    text(
-                        f"""SELECT DISTINCT json_extract(j.value, :{sp_param}) AS value
-                        FROM "{table_name}",
-                        json_each(json_extract("{table_name}".{column_name}, :{pa_param})) AS j
-                        WHERE json_extract(j.value, :{sp_param}) IS NOT NULL"""
-                    ).bindparams(
-                        **{
-                            pa_param: path_to_array,
-                            sp_param: sub_path,
-                        }
-                    )
-                ).fetchall()
-        return sorted(row[0] for row in rows)
-
     def add_message_pieces_to_memory(self, *, message_pieces: Sequence[MessagePiece]) -> None:
         """
         Insert a list of message pieces into the memory storage.
@@ -651,6 +603,44 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
             )
         )
         return labels_subquery  # noqa: RET504
+
+    def get_unique_attack_class_names(self) -> list[str]:
+        """
+        SQLite implementation: extract unique class_name values from
+        the atomic_attack_identifier JSON column.
+
+        Returns:
+            Sorted list of unique attack class name strings.
+        """
+        with closing(self.get_session()) as session:
+            class_name_expr = func.json_extract(
+                AttackResultEntry.atomic_attack_identifier, "$.children.attack.class_name"
+            )
+            rows = session.query(class_name_expr).filter(class_name_expr.isnot(None)).distinct().all()
+        return sorted(row[0] for row in rows)
+
+    def get_unique_converter_class_names(self) -> list[str]:
+        """
+        SQLite implementation: extract unique converter class_name values
+        from the children.attack.children.request_converters array in the
+        atomic_attack_identifier JSON column.
+
+        Returns:
+            Sorted list of unique converter class name strings.
+        """
+        with closing(self.get_session()) as session:
+            rows = session.execute(
+                text(
+                    """SELECT DISTINCT json_extract(j.value, '$.class_name') AS cls
+                    FROM "AttackResultEntries",
+                    json_each(
+                        json_extract("AttackResultEntries".atomic_attack_identifier,
+                            '$.children.attack.children.request_converters')
+                    ) AS j
+                    WHERE cls IS NOT NULL"""
+                )
+            ).fetchall()
+        return sorted(row[0] for row in rows)
 
     def get_conversation_stats(self, *, conversation_ids: Sequence[str]) -> dict[str, ConversationStats]:
         """
