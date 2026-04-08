@@ -685,7 +685,6 @@ def test_get_scenario_results_by_target_identifier_filter_hash(sqlite_instance: 
             IdentifierFilter(
                 identifier_type=IdentifierType.TARGET,
                 property_path="$.hash",
-                sub_path=None,
                 value_to_match=target_id_1.hash,
                 partial_match=False,
             )
@@ -732,7 +731,6 @@ def test_get_scenario_results_by_target_identifier_filter_endpoint(sqlite_instan
             IdentifierFilter(
                 identifier_type=IdentifierType.TARGET,
                 property_path="$.endpoint",
-                sub_path=None,
                 value_to_match="openai",
                 partial_match=True,
             )
@@ -764,7 +762,6 @@ def test_get_scenario_results_by_target_identifier_filter_no_match(sqlite_instan
             IdentifierFilter(
                 identifier_type=IdentifierType.TARGET,
                 property_path="$.hash",
-                sub_path=None,
                 value_to_match="nonexistent_hash",
                 partial_match=False,
             )

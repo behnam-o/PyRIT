@@ -1280,7 +1280,6 @@ def test_get_message_pieces_by_attack_identifier_filter(sqlite_instance: MemoryI
             IdentifierFilter(
                 identifier_type=IdentifierType.ATTACK,
                 property_path="$.hash",
-                sub_path=None,
                 value_to_match=attack1.get_identifier().hash,
                 partial_match=False,
             )
@@ -1295,7 +1294,6 @@ def test_get_message_pieces_by_attack_identifier_filter(sqlite_instance: MemoryI
             IdentifierFilter(
                 identifier_type=IdentifierType.ATTACK,
                 property_path="$.hash",
-                sub_path=None,
                 value_to_match="nonexistent_hash",
                 partial_match=False,
             )
@@ -1341,7 +1339,6 @@ def test_get_message_pieces_by_target_identifier_filter(sqlite_instance: MemoryI
             IdentifierFilter(
                 identifier_type=IdentifierType.TARGET,
                 property_path="$.hash",
-                sub_path=None,
                 value_to_match=target_id_1.hash,
                 partial_match=False,
             )
@@ -1356,7 +1353,6 @@ def test_get_message_pieces_by_target_identifier_filter(sqlite_instance: MemoryI
             IdentifierFilter(
                 identifier_type=IdentifierType.TARGET,
                 property_path="$.endpoint",
-                sub_path=None,
                 value_to_match="openai",
                 partial_match=True,
             )
@@ -1371,7 +1367,6 @@ def test_get_message_pieces_by_target_identifier_filter(sqlite_instance: MemoryI
             IdentifierFilter(
                 identifier_type=IdentifierType.TARGET,
                 property_path="$.hash",
-                sub_path=None,
                 value_to_match="nonexistent",
                 partial_match=False,
             )

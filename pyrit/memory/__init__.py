@@ -9,7 +9,7 @@ This package defines the core `MemoryInterface` and concrete implementations for
 
 from pyrit.memory.azure_sql_memory import AzureSQLMemory
 from pyrit.memory.central_memory import CentralMemory
-from pyrit.memory.identifier_filters import IdentifierFilter
+from pyrit.memory.identifier_filters import IdentifierFilter, IdentifierType
 from pyrit.memory.memory_embedding import MemoryEmbedding
 from pyrit.memory.memory_exporter import MemoryExporter
 from pyrit.memory.memory_interface import MemoryInterface
@@ -28,4 +28,5 @@ __all__ = [
     "PromptMemoryEntry",
     "SeedEntry",
     "IdentifierFilter",
+    "IdentifierType",
 ]

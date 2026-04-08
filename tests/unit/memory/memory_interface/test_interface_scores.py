@@ -266,7 +266,6 @@ def test_get_scores_by_scorer_identifier_filter(
             IdentifierFilter(
                 identifier_type=IdentifierType.SCORER,
                 property_path="$.class_name",
-                sub_path=None,
                 value_to_match="ScorerAlpha",
                 partial_match=False,
             )
@@ -281,7 +280,6 @@ def test_get_scores_by_scorer_identifier_filter(
             IdentifierFilter(
                 identifier_type=IdentifierType.SCORER,
                 property_path="$.class_name",
-                sub_path=None,
                 value_to_match="Scorer",
                 partial_match=True,
             )
@@ -296,7 +294,6 @@ def test_get_scores_by_scorer_identifier_filter(
             IdentifierFilter(
                 identifier_type=IdentifierType.SCORER,
                 property_path="$.hash",
-                sub_path=None,
                 value_to_match=scorer_hash,
                 partial_match=False,
             )
@@ -311,7 +308,6 @@ def test_get_scores_by_scorer_identifier_filter(
             IdentifierFilter(
                 identifier_type=IdentifierType.SCORER,
                 property_path="$.class_name",
-                sub_path=None,
                 value_to_match="NonExistent",
                 partial_match=False,
             )
