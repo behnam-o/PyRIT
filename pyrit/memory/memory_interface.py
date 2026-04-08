@@ -127,7 +127,7 @@ class MemoryInterface(abc.ABC):
         caller: str,
     ) -> list[Any]:
         """
-        Build SQLAlchemy conditions from a set of IdentifierFilters.
+        Build SQLAlchemy conditions from a sequence of IdentifierFilters.
 
         Args:
             identifier_filters (Sequence[IdentifierFilter]): The filters to convert to conditions.
@@ -548,7 +548,7 @@ class MemoryInterface(abc.ABC):
             score_category (Optional[str]): The category of the score to filter by.
             sent_after (Optional[datetime]): Filter for scores sent after this datetime.
             sent_before (Optional[datetime]): Filter for scores sent before this datetime.
-            identifier_filters (Optional[Sequence[IdentifierFilter]]): A set of IdentifierFilter objects that
+            identifier_filters (Optional[Sequence[IdentifierFilter]]): A sequence of IdentifierFilter objects that
                 allows filtering by various scorer identifier JSON properties. Defaults to None.
 
         Returns:
@@ -727,7 +727,7 @@ class MemoryInterface(abc.ABC):
             converted_value_sha256 (Optional[Sequence[str]], optional): A list of SHA256 hashes of converted values.
                 Defaults to None.
             identifier_filters (Optional[Sequence[IdentifierFilter]], optional):
-                A set of IdentifierFilter objects that
+                A sequence of IdentifierFilter objects that
                 allow filtering by various identifier JSON properties. Defaults to None.
 
         Returns:
@@ -1538,7 +1538,7 @@ class MemoryInterface(abc.ABC):
                 These labels are associated with the prompts themselves, used for custom tagging and tracking.
                 Defaults to None.
             identifier_filters (Optional[Sequence[IdentifierFilter]], optional):
-                A set of IdentifierFilter objects that allows filtering by various attack identifier
+                A sequence of IdentifierFilter objects that allows filtering by various attack identifier
                 JSON properties. Defaults to None.
 
         Returns:
@@ -1808,7 +1808,7 @@ class MemoryInterface(abc.ABC):
                 objective_target_identifier has a model_name attribute containing this value (case-insensitive).
                 Defaults to None.
             identifier_filters (Optional[Sequence[IdentifierFilter]], optional):
-                A set of IdentifierFilter objects that allows filtering by various target identifier JSON properties.
+                A sequence of IdentifierFilter objects that allows filtering by various target identifier JSON properties.
                 Defaults to None.
 
         Returns:
