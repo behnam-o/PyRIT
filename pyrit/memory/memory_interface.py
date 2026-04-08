@@ -258,7 +258,7 @@ class MemoryInterface(abc.ABC):
         *,
         json_column: InstrumentedAttribute[Any],
         property_path: str,
-        sub_path: Optional[str] = None,
+        sub_path: str | None = None,
         array_to_match: Sequence[str],
     ) -> Any:
         """
@@ -1828,6 +1828,7 @@ class MemoryInterface(abc.ABC):
                 Defaults to None.
             identifier_filters (Optional[set[IdentifierFilter]], optional):
                 A set of IdentifierFilter objects that allows filtering by various target identifier JSON properties.
+                Defaults to None.
 
         Returns:
             Sequence[ScenarioResult]: A list of ScenarioResult objects that match the specified filters.

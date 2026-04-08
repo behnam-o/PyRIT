@@ -261,22 +261,21 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         value_expression = f"LOWER(json_extract(value, :{sp_param}))" if sub_path else "LOWER(value)"
 
         conditions = []
+        bindparams_dict: dict[str, str] = {pp_param: property_path}
+        if sub_path:
+            bindparams_dict[sp_param] = sub_path
+
         for index, match_value in enumerate(array_to_match):
             mv_param = f"mv_{uid}_{index}"
-            bind_params: dict[str, str] = {
-                pp_param: property_path,
-                mv_param: match_value.lower(),
-            }
-            if sub_path:
-                bind_params[sp_param] = sub_path
             conditions.append(
-                text(
-                    f"""EXISTS(SELECT 1 FROM json_each(
+                f"""EXISTS(SELECT 1 FROM json_each(
                         json_extract("{table_name}".{column_name}, :{pp_param}))
                         WHERE {value_expression} = :{mv_param})"""
-                ).bindparams(**bind_params)
             )
-        return and_(*conditions)
+            bindparams_dict[mv_param] = match_value.lower()
+
+        combined = " AND ".join(conditions)
+        return text(combined).bindparams(**bindparams_dict)
 
     def _get_unique_json_array_values(
         self,
@@ -325,27 +324,6 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
                     )
                 ).fetchall()
         return sorted(row[0] for row in rows)
-
-    def get_unique_attack_class_names(self) -> list[str]:
-        """
-        SQLite implementation: extract unique class_name values from
-        the atomic_attack_identifier JSON column.
-
-        Returns:
-            Sorted list of unique attack class name strings.
-        """
-        return super().get_unique_attack_class_names()
-
-    def get_unique_converter_class_names(self) -> list[str]:
-        """
-        SQLite implementation: extract unique converter class_name values
-        from the children.attack.children.request_converters array in the
-        atomic_attack_identifier JSON column.
-
-        Returns:
-            Sorted list of unique converter class name strings.
-        """
-        return super().get_unique_converter_class_names()
 
     def add_message_pieces_to_memory(self, *, message_pieces: Sequence[MessagePiece]) -> None:
         """
