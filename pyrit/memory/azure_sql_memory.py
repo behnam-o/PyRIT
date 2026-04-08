@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
 from sqlalchemy import and_, create_engine, event, exists, text
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import joinedload, sessionmaker
+from sqlalchemy.orm import InstrumentedAttribute, joinedload, sessionmaker
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.expression import TextClause
 
@@ -308,7 +308,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
     def _get_condition_json_property_match(
         self,
         *,
-        json_column: Any,
+        json_column: InstrumentedAttribute[Any],
         property_path: str,
         value_to_match: str,
         partial_match: bool = False,
@@ -353,7 +353,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
     def _get_condition_json_array_match(
         self,
         *,
-        json_column: Any,
+        json_column: InstrumentedAttribute[Any],
         property_path: str,
         array_element_path: str | None = None,
         array_to_match: Sequence[str],
@@ -366,8 +366,8 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
             property_path (str): The JSON path for the target array.
             array_element_path (Optional[str]): An optional JSON path applied to each array item before matching.
             array_to_match (Sequence[str]): The array that must match the extracted JSON array values.
-            For a match, ALL values in this array must be present in the JSON array.
-            If `array_to_match` is empty, the condition must match only if the target is also an empty array or None.
+                For a match, ALL values in this array must be present in the JSON array.
+                If `array_to_match` is empty, the condition matches only if the target is also an empty array or None.
 
         Returns:
             Any: A database-specific SQLAlchemy condition.

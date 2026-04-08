@@ -194,6 +194,8 @@ class MemoryInterface(abc.ABC):
         """
         if array_element_path and (partial_match or case_sensitive):
             raise ValueError("Cannot use array_element_path with partial_match or case_sensitive")
+        if partial_match and case_sensitive:
+            raise ValueError("case_sensitive is not reliably supported with partial_match across all backends")
         if array_element_path:
             return self._get_condition_json_array_match(
                 json_column=json_column,

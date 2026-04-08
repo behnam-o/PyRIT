@@ -13,7 +13,7 @@ from typing import Any, Optional, TypeVar, Union
 from sqlalchemy import and_, create_engine, func, or_, text
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import joinedload, sessionmaker
+from sqlalchemy.orm import InstrumentedAttribute, joinedload, sessionmaker
 from sqlalchemy.orm.session import Session
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.sql.expression import TextClause
@@ -193,7 +193,7 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
     def _get_condition_json_property_match(
         self,
         *,
-        json_column: Any,
+        json_column: InstrumentedAttribute[Any],
         property_path: str,
         value_to_match: str,
         partial_match: bool = False,
@@ -226,7 +226,7 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
     def _get_condition_json_array_match(
         self,
         *,
-        json_column: Any,
+        json_column: InstrumentedAttribute[Any],
         property_path: str,
         array_element_path: str | None = None,
         array_to_match: Sequence[str],
