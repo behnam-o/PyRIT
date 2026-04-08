@@ -252,8 +252,8 @@ class MemoryInterface(abc.ABC):
             property_path (str): The JSON path for the target array.
             array_element_path (Optional[str]): An optional JSON path applied to each array item before matching.
             array_to_match (Sequence[str]): The array that must match the extracted JSON array values.
-            For a match, ALL values in this array must be present in the JSON array.
-            If `array_to_match` is empty, the condition must match only if the target is also an empty array or None.
+                For a match, ALL values in this array must be present in the JSON array.
+                If `array_to_match` is empty, the condition matches only if the target is also an empty array or None.
 
         Returns:
             Any: A database-specific SQLAlchemy condition.
