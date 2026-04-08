@@ -228,7 +228,7 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         *,
         json_column: Any,
         property_path: str,
-        sub_path: str | None = None,
+        array_element_path: str | None = None,
         array_to_match: Sequence[str],
     ) -> Any:
         """
@@ -237,7 +237,7 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         Args:
             json_column (InstrumentedAttribute[Any]): The JSON-backed SQLAlchemy field to query.
             property_path (str): The JSON path for the target array.
-            sub_path (Optional[str]): An optional JSON path applied to each array item before matching.
+            array_element_path (Optional[str]): An optional JSON path applied to each array item before matching.
             array_to_match (Sequence[str]): The array that must match the extracted JSON array values.
             For a match, ALL values in this array must be present in the JSON array.
             If `array_to_match` is empty, the condition must match only if the target is also an empty array or None.
@@ -257,13 +257,13 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         table_name = json_column.class_.__tablename__
         column_name = json_column.key
         pp_param = f"property_path_{uid}"
-        sp_param = f"sub_path_{uid}"
-        value_expression = f"LOWER(json_extract(value, :{sp_param}))" if sub_path else "LOWER(value)"
+        sp_param = f"array_element_path_{uid}"
+        value_expression = f"LOWER(json_extract(value, :{sp_param}))" if array_element_path else "LOWER(value)"
 
         conditions = []
         bindparams_dict: dict[str, str] = {pp_param: property_path}
-        if sub_path:
-            bindparams_dict[sp_param] = sub_path
+        if array_element_path:
+            bindparams_dict[sp_param] = array_element_path
 
         for index, match_value in enumerate(array_to_match):
             mv_param = f"mv_{uid}_{index}"

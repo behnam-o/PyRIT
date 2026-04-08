@@ -154,7 +154,7 @@ class MemoryInterface(abc.ABC):
                 self._get_condition_json_match(
                     json_column=column,
                     property_path=identifier_filter.property_path,
-                    sub_path=identifier_filter.sub_path,
+                    array_element_path=identifier_filter.array_element_path,
                     value_to_match=identifier_filter.value_to_match,
                     partial_match=identifier_filter.partial_match,
                     case_sensitive=identifier_filter.case_sensitive,
@@ -167,19 +167,19 @@ class MemoryInterface(abc.ABC):
         *,
         json_column: InstrumentedAttribute[Any],
         property_path: str,
-        sub_path: str | None = None,
+        array_element_path: str | None = None,
         value_to_match: str,
         partial_match: bool = False,
         case_sensitive: bool = False,
     ) -> Any:
         """
         Return a database-specific condition for matching a value at a given path within a JSON object
-        or within items of a JSON array if sub_path is provided.
+        or within items of a JSON array if array_element_path is provided.
 
         Args:
             json_column (InstrumentedAttribute[Any]): The JSON-backed model field to query.
             property_path (str): The JSON path for the property to match.
-            sub_path (str | None): An optional JSON path that indicates property at property_path is an array
+            array_element_path (str | None): An optional JSON path that indicates property at property_path is an array
                 and the condition should resolve if any element in that array matches the value.
                 Cannot be used with partial_match.
             value_to_match (str): The string value that must match the extracted JSON property value.
@@ -190,15 +190,15 @@ class MemoryInterface(abc.ABC):
             Any: A SQLAlchemy condition for the backend-specific JSON query.
 
         Raises:
-            ValueError: If sub_path is provided together with partial_match or case_sensitive
+            ValueError: If array_element_path is provided together with partial_match or case_sensitive
         """
-        if sub_path and (partial_match or case_sensitive):
-            raise ValueError("Cannot use sub_path with partial_match or case_sensitive")
-        if sub_path:
+        if array_element_path and (partial_match or case_sensitive):
+            raise ValueError("Cannot use array_element_path with partial_match or case_sensitive")
+        if array_element_path:
             return self._get_condition_json_array_match(
                 json_column=json_column,
                 property_path=property_path,
-                sub_path=sub_path,
+                array_element_path=array_element_path,
                 array_to_match=[value_to_match],
             )
         return self._get_condition_json_property_match(
@@ -239,7 +239,7 @@ class MemoryInterface(abc.ABC):
         *,
         json_column: InstrumentedAttribute[Any],
         property_path: str,
-        sub_path: str | None = None,
+        array_element_path: str | None = None,
         array_to_match: Sequence[str],
     ) -> Any:
         """
@@ -248,7 +248,7 @@ class MemoryInterface(abc.ABC):
         Args:
             json_column (InstrumentedAttribute[Any]): The JSON-backed SQLAlchemy field to query.
             property_path (str): The JSON path for the target array.
-            sub_path (Optional[str]): An optional JSON path applied to each array item before matching.
+            array_element_path (Optional[str]): An optional JSON path applied to each array item before matching.
             array_to_match (Sequence[str]): The array that must match the extracted JSON array values.
             For a match, ALL values in this array must be present in the JSON array.
             If `array_to_match` is empty, the condition must match only if the target is also an empty array or None.
@@ -1547,7 +1547,7 @@ class MemoryInterface(abc.ABC):
                 self._get_condition_json_array_match(
                     json_column=AttackResultEntry.atomic_attack_identifier,
                     property_path="$.children.attack.children.request_converters",
-                    sub_path="$.class_name",
+                    array_element_path="$.class_name",
                     array_to_match=converter_classes,
                 )
             )

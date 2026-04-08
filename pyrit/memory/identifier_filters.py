@@ -22,18 +22,19 @@ class IdentifierFilter:
     Attributes:
         identifier_type: The type of identifier column to filter on.
         property_path: The JSON path for the property to match.
-        sub_path: An optional JSON path that indicates the property at property_path is an array
-            and the condition should resolve if any element in that array matches the value.
-            Cannot be used with partial_match.
+        array_element_path : An optional JSON path that indicates the property at property_path is an array
+            and the condition should resolve if the value at array_element_path matches the target
+            for any element in that array. Cannot be used with partial_match or case_sensitive.
         value_to_match: The string value that must match the extracted JSON property value.
-        partial_match: Whether to perform a substring match. Cannot be used with sub_path.
-        case_sensitive: Whether the match should be case-sensitive. Defaults to False.
+        partial_match: Whether to perform a substring match. Cannot be used with array_element_path or case_sensitive.
+        case_sensitive: Whether the match should be case-sensitive.
+            Cannot be used with array_element_path or partial_match.
     """
 
     identifier_type: IdentifierType
     property_path: str
     value_to_match: str
-    sub_path: str | None = None
+    array_element_path: str | None = None
     partial_match: bool = False
     case_sensitive: bool = False
 
@@ -44,5 +45,7 @@ class IdentifierFilter:
         Raises:
             ValueError: If the filter configuration is not valid.
         """
-        if self.sub_path and (self.partial_match or self.case_sensitive):
-            raise ValueError("Cannot use sub_path with partial_match or case_sensitive")
+        if self.array_element_path and (self.partial_match or self.case_sensitive):
+            raise ValueError("Cannot use array_element_path with partial_match or case_sensitive")
+        if self.partial_match and self.case_sensitive:
+            raise ValueError("case_sensitive is not reliably supported with partial_match across all backends")

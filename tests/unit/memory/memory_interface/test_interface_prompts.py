@@ -1375,7 +1375,7 @@ def test_get_message_pieces_by_target_identifier_filter(sqlite_instance: MemoryI
     assert len(results) == 0
 
 
-def test_get_message_pieces_by_converter_identifier_filter_with_sub_path(sqlite_instance: MemoryInterface):
+def test_get_message_pieces_by_converter_identifier_filter_with_array_element_path(sqlite_instance: MemoryInterface):
     converter_a = ComponentIdentifier(
         class_name="Base64Converter",
         class_module="pyrit.prompt_converter",
@@ -1410,13 +1410,13 @@ def test_get_message_pieces_by_converter_identifier_filter_with_sub_path(sqlite_
 
     sqlite_instance._insert_entries(entries=entries)
 
-    # Filter by converter class_name using sub_path (array element matching)
+    # Filter by converter class_name using array_element_path (array element matching)
     results = sqlite_instance.get_message_pieces(
         identifier_filters=[
             IdentifierFilter(
                 identifier_type=IdentifierType.CONVERTER,
                 property_path="$",
-                sub_path="$.class_name",
+                array_element_path="$.class_name",
                 value_to_match="Base64Converter",
             )
         ],
@@ -1431,7 +1431,7 @@ def test_get_message_pieces_by_converter_identifier_filter_with_sub_path(sqlite_
             IdentifierFilter(
                 identifier_type=IdentifierType.CONVERTER,
                 property_path="$",
-                sub_path="$.class_name",
+                array_element_path="$.class_name",
                 value_to_match="ROT13Converter",
             )
         ],
@@ -1445,7 +1445,7 @@ def test_get_message_pieces_by_converter_identifier_filter_with_sub_path(sqlite_
             IdentifierFilter(
                 identifier_type=IdentifierType.CONVERTER,
                 property_path="$",
-                sub_path="$.class_name",
+                array_element_path="$.class_name",
                 value_to_match="NonexistentConverter",
             )
         ],
