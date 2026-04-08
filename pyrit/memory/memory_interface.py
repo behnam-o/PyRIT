@@ -1808,7 +1808,7 @@ class MemoryInterface(abc.ABC):
                 objective_target_identifier has a model_name attribute containing this value (case-insensitive).
                 Defaults to None.
             identifier_filters (Optional[Sequence[IdentifierFilter]], optional):
-                A sequence of IdentifierFilter objects that allows filtering by various target identifier JSON properties.
+                A sequence of IdentifierFilter objects that allows filtering by identifier JSON properties.
                 Defaults to None.
 
         Returns:
