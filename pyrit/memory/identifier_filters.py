@@ -32,8 +32,8 @@ class IdentifierFilter:
 
     identifier_type: IdentifierType
     property_path: str
-    sub_path: str | None
     value_to_match: str
+    sub_path: str | None = None
     partial_match: bool = False
     case_sensitive: bool = False
 

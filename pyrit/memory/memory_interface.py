@@ -120,7 +120,7 @@ class MemoryInterface(abc.ABC):
         self.memory_embedding = None
 
     def _get_condition_identifier_property_match(
-        self, identifier_column: Any, identifier_filter: IdentifierFilter
+        self, *, identifier_column: Any, identifier_filter: IdentifierFilter
     ) -> Any:
         """
         Build a SQLAlchemy condition that matches a JSON identifier column against the given filter.
@@ -141,6 +141,45 @@ class MemoryInterface(abc.ABC):
             partial_match=identifier_filter.partial_match,
             case_sensitive=identifier_filter.case_sensitive,
         )
+
+    def _build_identifier_filter_conditions(
+        self,
+        *,
+        identifier_filters: set[IdentifierFilter],
+        identifier_column_map: dict[IdentifierType, Any],
+        caller: str,
+    ) -> list[Any]:
+        """
+        Build SQLAlchemy conditions from a set of IdentifierFilters.
+
+        Args:
+            identifier_filters (set[IdentifierFilter]): The filters to convert to conditions.
+            identifier_column_map (dict[IdentifierType, Any]): Mapping from IdentifierType to the
+                JSON-backed SQLAlchemy column that should be queried for that type.
+            caller (str): Name of the calling method, used in error messages.
+
+        Returns:
+            list[Any]: A list of SQLAlchemy conditions.
+
+        Raises:
+            ValueError: If a filter uses an IdentifierType not in identifier_column_map.
+        """
+        conditions: list[Any] = []
+        for identifier_filter in identifier_filters:
+            column = identifier_column_map.get(identifier_filter.identifier_type)
+            if column is None:
+                supported = ", ".join(t.name for t in identifier_column_map)
+                raise ValueError(
+                    f"{caller} does not support identifier type "
+                    f"{identifier_filter.identifier_type!r}. Supported: {supported}"
+                )
+            conditions.append(
+                self._get_condition_identifier_property_match(
+                    identifier_column=column,
+                    identifier_filter=identifier_filter,
+                )
+            )
+        return conditions
 
     def _get_condition_json_match(
         self,
@@ -542,20 +581,13 @@ class MemoryInterface(abc.ABC):
         if sent_before:
             conditions.append(ScoreEntry.timestamp <= sent_before)
         if identifier_filters:
-            for identifier_filter in identifier_filters:
-                column = None
-
-                match identifier_filter.identifier_type:
-                    case IdentifierType.SCORER:
-                        column = ScoreEntry.scorer_class_identifier
-
-                if column is not None:
-                    conditions.append(
-                        self._get_condition_identifier_property_match(
-                            identifier_column=column,
-                            identifier_filter=identifier_filter,
-                        )
-                    )
+            conditions.extend(
+                self._build_identifier_filter_conditions(
+                    identifier_filters=identifier_filters,
+                    identifier_column_map={IdentifierType.SCORER: ScoreEntry.scorer_class_identifier},
+                    caller="get_scores",
+                )
+            )
 
         if not conditions:
             return []
@@ -754,24 +786,17 @@ class MemoryInterface(abc.ABC):
         if converted_value_sha256:
             conditions.append(PromptMemoryEntry.converted_value_sha256.in_(converted_value_sha256))
         if identifier_filters:
-            for identifier_filter in identifier_filters:
-                column: Any = None
-
-                match identifier_filter.identifier_type:
-                    case IdentifierType.ATTACK:
-                        column = PromptMemoryEntry.attack_identifier
-                    case IdentifierType.TARGET:
-                        column = PromptMemoryEntry.prompt_target_identifier
-                    case IdentifierType.CONVERTER:
-                        column = PromptMemoryEntry.converter_identifiers
-
-                if column is not None:
-                    conditions.append(
-                        self._get_condition_identifier_property_match(
-                            identifier_column=column,
-                            identifier_filter=identifier_filter,
-                        )
-                    )
+            conditions.extend(
+                self._build_identifier_filter_conditions(
+                    identifier_filters=identifier_filters,
+                    identifier_column_map={
+                        IdentifierType.ATTACK: PromptMemoryEntry.attack_identifier,
+                        IdentifierType.TARGET: PromptMemoryEntry.prompt_target_identifier,
+                        IdentifierType.CONVERTER: PromptMemoryEntry.converter_identifiers,
+                    },
+                    caller="get_message_pieces",
+                )
+            )
         try:
             memory_entries: Sequence[PromptMemoryEntry] = self._query_entries(
                 PromptMemoryEntry, conditions=and_(*conditions) if conditions else None, join_scores=True
@@ -1584,20 +1609,13 @@ class MemoryInterface(abc.ABC):
             conditions.append(self._get_attack_result_label_condition(labels=labels))
 
         if identifier_filters:
-            for identifier_filter in identifier_filters:
-                column = None
-
-                match identifier_filter.identifier_type:
-                    case IdentifierType.ATTACK:
-                        column = AttackResultEntry.atomic_attack_identifier
-
-                if column is not None:
-                    conditions.append(
-                        self._get_condition_identifier_property_match(
-                            identifier_column=column,
-                            identifier_filter=identifier_filter,
-                        )
-                    )
+            conditions.extend(
+                self._build_identifier_filter_conditions(
+                    identifier_filters=identifier_filters,
+                    identifier_column_map={IdentifierType.ATTACK: AttackResultEntry.atomic_attack_identifier},
+                    caller="get_attack_results",
+                )
+            )
 
         try:
             entries: Sequence[AttackResultEntry] = self._query_entries(
@@ -1863,22 +1881,16 @@ class MemoryInterface(abc.ABC):
             )
 
         if identifier_filters:
-            for identifier_filter in identifier_filters:
-                column = None
-
-                match identifier_filter.identifier_type:
-                    case IdentifierType.SCORER:
-                        column = ScenarioResultEntry.objective_scorer_identifier
-                    case IdentifierType.TARGET:
-                        column = ScenarioResultEntry.objective_target_identifier
-
-                if column is not None:
-                    conditions.append(
-                        self._get_condition_identifier_property_match(
-                            identifier_column=column,
-                            identifier_filter=identifier_filter,
-                        )
-                    )
+            conditions.extend(
+                self._build_identifier_filter_conditions(
+                    identifier_filters=identifier_filters,
+                    identifier_column_map={
+                        IdentifierType.SCORER: ScenarioResultEntry.objective_scorer_identifier,
+                        IdentifierType.TARGET: ScenarioResultEntry.objective_target_identifier,
+                    },
+                    caller="get_scenario_results",
+                )
+            )
 
         try:
             entries: Sequence[ScenarioResultEntry] = self._query_entries(

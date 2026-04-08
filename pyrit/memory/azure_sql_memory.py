@@ -314,11 +314,6 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         partial_match: bool = False,
         case_sensitive: bool = False,
     ) -> Any:
-        uid = self._uid()
-        table_name = json_column.class_.__tablename__
-        column_name = json_column.key
-        pp_param = f"pp_{uid}"
-        mv_param = f"mv_{uid}"
         """
         Return an Azure SQL DB condition for matching a value at a given path within a JSON object.
 
@@ -332,6 +327,11 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         Returns:
             Any: A SQLAlchemy condition for the backend-specific JSON query.
         """
+        uid = self._uid()
+        table_name = json_column.class_.__tablename__
+        column_name = json_column.key
+        pp_param = f"pp_{uid}"
+        mv_param = f"mv_{uid}"
         json_func = "JSON_VALUE" if case_sensitive else "LOWER(JSON_VALUE)"
         operator = "LIKE" if partial_match else "="
         target = value_to_match if case_sensitive else value_to_match.lower()
