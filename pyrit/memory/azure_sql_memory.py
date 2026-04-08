@@ -339,9 +339,10 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
             escaped = target.replace("%", "\\%").replace("_", "\\_")
             target = f"%{escaped}%"
 
+        escape_clause = " ESCAPE '\\'" if partial_match else ""
         return text(
             f"""ISJSON("{table_name}".{column_name}) = 1
-                AND {json_func}("{table_name}".{column_name}, :{pp_param}) {operator} :{mv_param}"""
+                AND {json_func}("{table_name}".{column_name}, :{pp_param}) {operator} :{mv_param}{escape_clause}"""
         ).bindparams(
             **{
                 pp_param: property_path,
