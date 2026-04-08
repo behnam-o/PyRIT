@@ -119,29 +119,6 @@ class MemoryInterface(abc.ABC):
         """
         self.memory_embedding = None
 
-    def _get_condition_identifier_property_match(
-        self, *, identifier_column: Any, identifier_filter: IdentifierFilter
-    ) -> Any:
-        """
-        Build a SQLAlchemy condition that matches a JSON identifier column against the given filter.
-
-        Args:
-            identifier_column (Any): The JSON-backed SQLAlchemy column to query.
-            identifier_filter (IdentifierFilter): The filter specifying the property path,
-                optional sub-path, value to match, and whether to use partial matching.
-
-        Returns:
-            Any: A SQLAlchemy condition for the backend-specific JSON query.
-        """
-        return self._get_condition_json_match(
-            json_column=identifier_column,
-            property_path=identifier_filter.property_path,
-            sub_path=identifier_filter.sub_path,
-            value_to_match=identifier_filter.value_to_match,
-            partial_match=identifier_filter.partial_match,
-            case_sensitive=identifier_filter.case_sensitive,
-        )
-
     def _build_identifier_filter_conditions(
         self,
         *,
@@ -174,9 +151,13 @@ class MemoryInterface(abc.ABC):
                     f"{identifier_filter.identifier_type!r}. Supported: {supported}"
                 )
             conditions.append(
-                self._get_condition_identifier_property_match(
-                    identifier_column=column,
-                    identifier_filter=identifier_filter,
+                self._get_condition_json_match(
+                    json_column=column,
+                    property_path=identifier_filter.property_path,
+                    sub_path=identifier_filter.sub_path,
+                    value_to_match=identifier_filter.value_to_match,
+                    partial_match=identifier_filter.partial_match,
+                    case_sensitive=identifier_filter.case_sensitive,
                 )
             )
         return conditions
