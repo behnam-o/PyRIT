@@ -128,7 +128,7 @@ for result in results:
 # We can retrieve only the prompts that were sent to a specific target.
 
 # %%
-from pyrit.memory import IdentifierFilter, IdentifierType
+from pyrit.identifiers.identifier_filters import IdentifierFilter, IdentifierType
 
 # Get only the prompts that were sent to TextTarget
 text_target_filter = IdentifierFilter(

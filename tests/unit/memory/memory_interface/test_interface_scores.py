@@ -12,8 +12,8 @@ from unit.mocks import get_mock_target
 
 from pyrit.executor.attack.single_turn.prompt_sending import PromptSendingAttack
 from pyrit.identifiers import ComponentIdentifier
+from pyrit.identifiers.identifier_filters import IdentifierFilter, IdentifierType
 from pyrit.memory import MemoryInterface, PromptMemoryEntry
-from pyrit.memory.identifier_filters import IdentifierFilter, IdentifierType
 from pyrit.models import (
     MessagePiece,
     Score,

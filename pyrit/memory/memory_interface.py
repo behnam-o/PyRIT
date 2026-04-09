@@ -19,7 +19,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from pyrit.common.path import DB_DATA_PATH
-from pyrit.memory.identifier_filters import IdentifierFilter, IdentifierType
+from pyrit.identifiers.identifier_filters import IdentifierFilter, IdentifierType
 from pyrit.memory.memory_embedding import (
     MemoryEmbedding,
     default_memory_embedding_factory,

@@ -8,8 +8,8 @@ import pytest
 from unit.mocks import get_mock_scorer_identifier
 
 from pyrit.identifiers import ComponentIdentifier
+from pyrit.identifiers.identifier_filters import IdentifierFilter, IdentifierType
 from pyrit.memory import MemoryInterface
-from pyrit.memory.identifier_filters import IdentifierFilter, IdentifierType
 from pyrit.models import (
     AttackOutcome,
     AttackResult,
