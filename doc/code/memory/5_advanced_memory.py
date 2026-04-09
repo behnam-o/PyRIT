@@ -15,7 +15,10 @@
 #
 # 1. **Memory Labels** — free-form key/value tags attached to every prompt, useful for grouping and retrieval.
 # 2. **Identifier Filters** — structured filters that match against the JSON-backed identifier columns
-#    (target, converter, scorer, attack) stored alongside each `MessagePiece`.
+#    (target, converter, scorer, attack) stored alongside different memory entities, such as `MessagePiece`, `AttackResult`, etc. 
+#    This notebook demonstrates the functionality with `MessagePiece` entities, but the concepts are similar for other memory entities.
+# 3. **Score Identifier Filters** — the same `IdentifierFilter` mechanism applied to `memory.get_scores()` for
+#    retrieving scores by scorer identity (class name, custom parameters, etc.).
 #
 # ## Part 1 — Memory Labels
 #
@@ -144,7 +147,7 @@ for filter_target_class in filter_target_classes:
         identifier_filters=[target_class_filter],
     )
 
-    print(f"Message pieces sent to {filter_target_class}: {len(target_class_pieces)}")
+    print(f"Message pieces to/from {filter_target_class}: {len(target_class_pieces)}")
     for piece in target_class_pieces:
         print(f"  [{piece.role}] {piece.converted_value[:80]}")
 
@@ -167,7 +170,7 @@ openai_pieces = memory.get_message_pieces(
     identifier_filters=[openai_filter],
 )
 
-print(f"Message pieces sent to *OpenAI* targets: {len(openai_pieces)}")
+print(f"Message pieces to/from *OpenAI* targets: {len(openai_pieces)}")
 for piece in openai_pieces:
     print(f"  [{piece.role}] {piece.original_value[:80]}")
 
@@ -201,11 +204,17 @@ for piece in base64_pieces:
 # Here we find prompts that were sent to a `TextTarget` **and** used a `Base64Converter`.
 
 # %%
+text_target_filter = IdentifierFilter(
+    identifier_type=IdentifierType.TARGET,
+    property_path="$.class_name",
+    value="TextTarget",
+)
+
 combined_pieces = memory.get_message_pieces(
     identifier_filters=[text_target_filter, converter_filter],
 )
 
-print(f"Pieces sent to TextTarget AND using Base64Converter: {len(combined_pieces)}")
+print(f"Pieces to/from TextTarget AND using Base64Converter: {len(combined_pieces)}")
 for piece in combined_pieces:
     print(f"  [{piece.role}] {piece.original_value[:80]}")
 
@@ -226,3 +235,118 @@ labeled_and_filtered = memory.get_message_pieces(
 print(f"Labeled + filtered pieces: {len(labeled_and_filtered)}")
 for piece in labeled_and_filtered:
     print(f"  [{piece.role}] {piece.original_value[:80]}")
+
+# %% [markdown]
+# ## Part 3 — Filtering Scores by Scorer Identity
+#
+# `IdentifierFilter` also works with `memory.get_scores()`. Every `Score` stored in memory records the
+# **scorer's identifier** — a JSON object that contains the class name as well as any custom parameters
+# the scorer was initialized with.
+#
+# In this example we create two `SubStringScorer` instances with different substrings, score the
+# assistant responses from Part 1, and then use `identifier_filters` on `memory.get_scores()` to
+# retrieve only the scores produced by a specific scorer.
+
+# %%
+from pyrit.models import Message
+from pyrit.score import SubStringScorer
+
+# Create three scorers with different substrings
+scorer_molotov = SubStringScorer(substring="molotov")
+scorer_launder = SubStringScorer(substring="launder")
+scorer_assist = SubStringScorer(substring="assist")  # intentionally bad scorer that matches when the phrase 'assist' is present in response. But good for demo.
+
+# Retrieve assistant responses from Part 1
+assistant_pieces = memory.get_message_pieces(
+    labels={"prompt_group": group1},
+    role="assistant",
+)
+
+# Wrap each piece in a Message so we can pass it to score_async
+assistant_messages = [Message([piece]) for piece in assistant_pieces]
+
+# Score every response with both scorers — scores are automatically persisted in memory
+for msg in assistant_messages:
+    await scorer_molotov.score_async(msg)  # type: ignore
+    await scorer_launder.score_async(msg)  # type: ignore
+    await scorer_assist.score_async(msg)  # type: ignore
+
+print(f"Scored {len(assistant_messages)} messages with all three scorers.")
+
+# %% [markdown]
+# ### Filter scores by scorer class name
+#
+# The simplest filter retrieves all scores produced by a particular scorer class.
+
+# %%
+# Retrieve all SubStringScorer scores regardless of which substring was used
+scorer_class_filter = IdentifierFilter(
+    identifier_type=IdentifierType.SCORER,
+    property_path="$.class_name",
+    value="SubStringScorer",
+)
+
+all_substring_scores = memory.get_scores(
+    identifier_filters=[scorer_class_filter],
+)
+
+print(f"Total SubStringScorer scores in memory: {len(all_substring_scores)}")
+for s in all_substring_scores:
+    print(f" score={s.get_value()}  category={s.score_category}")
+
+# %% [markdown]
+# ### Filter scores by custom scorer parameter
+#
+# Scorer identifiers store custom parameters alongside the class name. For `SubStringScorer`, the
+# identifier includes a `substring` property. We can filter on it to retrieve only the scores
+# produced by the scorer configured with a particular substring.
+
+# %%
+# Retrieve only scores from the scorer whose substring was "molotov"
+molotov_scorer_filter = IdentifierFilter(
+    identifier_type=IdentifierType.SCORER,
+    property_path="$.substring",
+    value="molotov",
+)
+
+molotov_scores = memory.get_scores(
+    identifier_filters=[molotov_scorer_filter],
+)
+
+print(f"Scores from the 'molotov' SubStringScorer: {len(molotov_scores)}")
+for s in molotov_scores:
+    print(f"  score={s.get_value()}  category={s.score_category}")
+
+print()
+
+# Now retrieve only scores from the scorer whose substring was "launder"
+launder_scorer_filter = IdentifierFilter(
+    identifier_type=IdentifierType.SCORER,
+    property_path="$.substring",
+    value="launder",
+)
+
+launder_scores = memory.get_scores(
+    identifier_filters=[launder_scorer_filter],
+)
+
+print(f"Scores from the 'launder' SubStringScorer: {len(launder_scores)}")
+for s in launder_scores:
+    print(f"  score={s.get_value()}  category={s.score_category}")
+
+print()
+
+# Now retrieve only scores from the scorer whose substring was "assist"
+assist_scorer_filter = IdentifierFilter(
+    identifier_type=IdentifierType.SCORER,
+    property_path="$.substring",
+    value="assist",
+)
+
+assist_scores = memory.get_scores(
+    identifier_filters=[assist_scorer_filter],
+)
+
+print(f"Scores from the 'assist' SubStringScorer: {len(assist_scores)}")
+for s in assist_scores:
+    print(f"  score={s.get_value()}  category={s.score_category}")
