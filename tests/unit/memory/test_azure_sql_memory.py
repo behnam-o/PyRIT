@@ -340,7 +340,7 @@ def test_get_condition_json_property_match_bind_params(
     condition = memory_interface._get_condition_json_property_match(
         json_column=PromptMemoryEntry.labels,
         property_path="$.key",
-        value_to_match="TestValue",
+        value="TestValue",
         partial_match=partial_match,
     )
     # Extract the compiled bind parameters (param names include a random uid suffix)

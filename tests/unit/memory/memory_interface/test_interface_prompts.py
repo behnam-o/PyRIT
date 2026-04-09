@@ -1280,7 +1280,7 @@ def test_get_message_pieces_by_attack_identifier_filter(sqlite_instance: MemoryI
             IdentifierFilter(
                 identifier_type=IdentifierType.ATTACK,
                 property_path="$.hash",
-                value_to_match=attack1.get_identifier().hash,
+                value=attack1.get_identifier().hash,
                 partial_match=False,
             )
         ],
@@ -1294,7 +1294,7 @@ def test_get_message_pieces_by_attack_identifier_filter(sqlite_instance: MemoryI
             IdentifierFilter(
                 identifier_type=IdentifierType.ATTACK,
                 property_path="$.hash",
-                value_to_match="nonexistent_hash",
+                value="nonexistent_hash",
                 partial_match=False,
             )
         ],
@@ -1339,7 +1339,7 @@ def test_get_message_pieces_by_target_identifier_filter(sqlite_instance: MemoryI
             IdentifierFilter(
                 identifier_type=IdentifierType.TARGET,
                 property_path="$.hash",
-                value_to_match=target_id_1.hash,
+                value=target_id_1.hash,
                 partial_match=False,
             )
         ],
@@ -1353,7 +1353,7 @@ def test_get_message_pieces_by_target_identifier_filter(sqlite_instance: MemoryI
             IdentifierFilter(
                 identifier_type=IdentifierType.TARGET,
                 property_path="$.endpoint",
-                value_to_match="openai",
+                value="openai",
                 partial_match=True,
             )
         ],
@@ -1367,7 +1367,7 @@ def test_get_message_pieces_by_target_identifier_filter(sqlite_instance: MemoryI
             IdentifierFilter(
                 identifier_type=IdentifierType.TARGET,
                 property_path="$.hash",
-                value_to_match="nonexistent",
+                value="nonexistent",
                 partial_match=False,
             )
         ],
@@ -1417,7 +1417,7 @@ def test_get_message_pieces_by_converter_identifier_filter_with_array_element_pa
                 identifier_type=IdentifierType.CONVERTER,
                 property_path="$",
                 array_element_path="$.class_name",
-                value_to_match="Base64Converter",
+                value="Base64Converter",
             )
         ],
     )
@@ -1432,7 +1432,7 @@ def test_get_message_pieces_by_converter_identifier_filter_with_array_element_pa
                 identifier_type=IdentifierType.CONVERTER,
                 property_path="$",
                 array_element_path="$.class_name",
-                value_to_match="ROT13Converter",
+                value="ROT13Converter",
             )
         ],
     )
@@ -1446,7 +1446,7 @@ def test_get_message_pieces_by_converter_identifier_filter_with_array_element_pa
                 identifier_type=IdentifierType.CONVERTER,
                 property_path="$",
                 array_element_path="$.class_name",
-                value_to_match="NonexistentConverter",
+                value="NonexistentConverter",
             )
         ],
     )

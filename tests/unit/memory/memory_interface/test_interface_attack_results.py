@@ -1367,7 +1367,7 @@ def test_get_attack_results_by_attack_identifier_filter_hash(sqlite_instance: Me
             IdentifierFilter(
                 identifier_type=IdentifierType.ATTACK,
                 property_path="$.hash",
-                value_to_match=ar1.atomic_attack_identifier.hash,
+                value=ar1.atomic_attack_identifier.hash,
                 partial_match=False,
             )
         ],
@@ -1389,7 +1389,7 @@ def test_get_attack_results_by_attack_identifier_filter_class_name(sqlite_instan
             IdentifierFilter(
                 identifier_type=IdentifierType.ATTACK,
                 property_path="$.children.attack.class_name",
-                value_to_match="Crescendo",
+                value="Crescendo",
                 partial_match=True,
             )
         ],
@@ -1408,7 +1408,7 @@ def test_get_attack_results_by_attack_identifier_filter_no_match(sqlite_instance
             IdentifierFilter(
                 identifier_type=IdentifierType.ATTACK,
                 property_path="$.hash",
-                value_to_match="nonexistent_hash",
+                value="nonexistent_hash",
                 partial_match=False,
             )
         ],

@@ -155,7 +155,7 @@ class MemoryInterface(abc.ABC):
                     json_column=column,
                     property_path=identifier_filter.property_path,
                     array_element_path=identifier_filter.array_element_path,
-                    value_to_match=identifier_filter.value_to_match,
+                    value=identifier_filter.value,
                     partial_match=identifier_filter.partial_match,
                     case_sensitive=identifier_filter.case_sensitive,
                 )
@@ -168,7 +168,7 @@ class MemoryInterface(abc.ABC):
         json_column: InstrumentedAttribute[Any],
         property_path: str,
         array_element_path: str | None = None,
-        value_to_match: str,
+        value: str,
         partial_match: bool = False,
         case_sensitive: bool = False,
     ) -> Any:
@@ -182,7 +182,7 @@ class MemoryInterface(abc.ABC):
             array_element_path (str | None): An optional JSON path that indicates property at property_path is an array
                 and the condition should resolve if any element in that array matches the value.
                 Cannot be used with partial_match.
-            value_to_match (str): The string value that must match the extracted JSON property value.
+            value (str): The string value that must match the extracted JSON property value.
             partial_match (bool): Whether to perform a substring match.
             case_sensitive (bool): Whether the match should be case-sensitive. Defaults to False.
 
@@ -201,12 +201,12 @@ class MemoryInterface(abc.ABC):
                 json_column=json_column,
                 property_path=property_path,
                 array_element_path=array_element_path,
-                array_to_match=[value_to_match],
+                array_to_match=[value],
             )
         return self._get_condition_json_property_match(
             json_column=json_column,
             property_path=property_path,
-            value_to_match=value_to_match,
+            value=value,
             partial_match=partial_match,
             case_sensitive=case_sensitive,
         )
@@ -217,7 +217,7 @@ class MemoryInterface(abc.ABC):
         *,
         json_column: InstrumentedAttribute[Any],
         property_path: str,
-        value_to_match: str,
+        value: str,
         partial_match: bool = False,
         case_sensitive: bool = False,
     ) -> Any:
@@ -227,7 +227,7 @@ class MemoryInterface(abc.ABC):
         Args:
             json_column (InstrumentedAttribute[Any]): The JSON-backed model field to query.
             property_path (str): The JSON path for the property to match.
-            value_to_match (str): The string value that must match the extracted JSON property value.
+            value (str): The string value that must match the extracted JSON property value.
             partial_match (bool): Whether to perform a substring match.
             case_sensitive (bool): Whether the match should be case-sensitive. Defaults to False.
 
@@ -713,7 +713,7 @@ class MemoryInterface(abc.ABC):
                 self._get_condition_json_property_match(
                     json_column=PromptMemoryEntry.attack_identifier,
                     property_path="$.hash",
-                    value_to_match=str(attack_id),
+                    value=str(attack_id),
                 )
             )
         if role:
@@ -1537,7 +1537,7 @@ class MemoryInterface(abc.ABC):
                 self._get_condition_json_property_match(
                     json_column=AttackResultEntry.atomic_attack_identifier,
                     property_path="$.children.attack.class_name",
-                    value_to_match=attack_class,
+                    value=attack_class,
                     case_sensitive=True,
                 )
             )
@@ -1821,7 +1821,7 @@ class MemoryInterface(abc.ABC):
                 self._get_condition_json_property_match(
                     json_column=ScenarioResultEntry.objective_target_identifier,
                     property_path="$.endpoint",
-                    value_to_match=objective_target_endpoint,
+                    value=objective_target_endpoint,
                     partial_match=True,
                 )
             )
@@ -1832,7 +1832,7 @@ class MemoryInterface(abc.ABC):
                 self._get_condition_json_property_match(
                     json_column=ScenarioResultEntry.objective_target_identifier,
                     property_path="$.model_name",
-                    value_to_match=objective_target_model_name,
+                    value=objective_target_model_name,
                     partial_match=True,
                 )
             )

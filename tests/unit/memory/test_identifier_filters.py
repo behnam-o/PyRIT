@@ -24,7 +24,7 @@ def test_identifier_filter_array_element_path_with_partial_or_case_sensitive_rai
         IdentifierFilter(
             identifier_type=IdentifierType.ATTACK,
             property_path="$.children",
-            value_to_match="test",
+            value="test",
             array_element_path=array_element_path,
             partial_match=partial_match,
             case_sensitive=case_sensitive,
@@ -35,7 +35,7 @@ def test_identifier_filter_valid_with_array_element_path():
     f = IdentifierFilter(
         identifier_type=IdentifierType.CONVERTER,
         property_path="$",
-        value_to_match="Base64Converter",
+        value="Base64Converter",
         array_element_path="$.class_name",
     )
     assert f.array_element_path == "$.class_name"
@@ -48,7 +48,7 @@ def test_build_identifier_filter_conditions_unsupported_type_raises(sqlite_insta
         IdentifierFilter(
             identifier_type=IdentifierType.SCORER,
             property_path="$.class_name",
-            value_to_match="MyScorer",
+            value="MyScorer",
         )
     ]
     with pytest.raises(ValueError, match="does not support identifier type"):

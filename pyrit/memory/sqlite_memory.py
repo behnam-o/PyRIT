@@ -195,7 +195,7 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         *,
         json_column: InstrumentedAttribute[Any],
         property_path: str,
-        value_to_match: str,
+        value: str,
         partial_match: bool = False,
         case_sensitive: bool = False,
     ) -> Any:
@@ -205,7 +205,7 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         Args:
             json_column (InstrumentedAttribute[Any]): The JSON-backed model field to query.
             property_path (str): The JSON path for the property to match.
-            value_to_match (str): The string value that must match the extracted JSON property value.
+            value (str): The string value that must match the extracted JSON property value.
             partial_match (bool): Whether to perform a substring match.
             case_sensitive (bool): Whether the match should be case-sensitive. Defaults to False.
 
@@ -214,9 +214,9 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         """
         raw = func.json_extract(json_column, property_path)
         if case_sensitive:
-            extracted_value, target = raw, value_to_match
+            extracted_value, target = raw, value
         else:
-            extracted_value, target = func.lower(raw), value_to_match.lower()
+            extracted_value, target = func.lower(raw), value.lower()
 
         if partial_match:
             escaped = target.replace("%", "\\%").replace("_", "\\_")

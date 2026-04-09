@@ -25,7 +25,7 @@ class IdentifierFilter:
         array_element_path : An optional JSON path that indicates the property at property_path is an array
             and the condition should resolve if the value at array_element_path matches the target
             for any element in that array. Cannot be used with partial_match or case_sensitive.
-        value_to_match: The string value that must match the extracted JSON property value.
+        value: The string value that must match the extracted JSON property value.
         partial_match: Whether to perform a substring match. Cannot be used with array_element_path or case_sensitive.
         case_sensitive: Whether the match should be case-sensitive.
             Cannot be used with array_element_path or partial_match.
@@ -33,7 +33,7 @@ class IdentifierFilter:
 
     identifier_type: IdentifierType
     property_path: str
-    value_to_match: str
+    value: str
     array_element_path: str | None = None
     partial_match: bool = False
     case_sensitive: bool = False
