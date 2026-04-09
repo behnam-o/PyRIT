@@ -130,20 +130,23 @@ for result in results:
 # %%
 from pyrit.identifiers.identifier_filters import IdentifierFilter, IdentifierType
 
-# Get only the prompts that were sent to a specific target
-target_class_filter = IdentifierFilter(
-    identifier_type=IdentifierType.TARGET,
-    property_path="$.class_name",
-    value="TextTarget",
-)
+filter_target_classes = ["OpenAIChatTarget", "TextTarget"]
 
-target_class_pieces = memory.get_message_pieces(
-    identifier_filters=[target_class_filter],
-)
+for filter_target_class in filter_target_classes:
+    # Get only the prompts that were sent to a specific target
+    target_class_filter = IdentifierFilter(
+        identifier_type=IdentifierType.TARGET,
+        property_path="$.class_name",
+        value=filter_target_class,
+    )
 
-print(f"Message pieces sent to TextTarget: {len(target_class_pieces)}")
-for piece in target_class_pieces:
-    print(f"  [{piece.role}] {piece.converted_value[:80]}")
+    target_class_pieces = memory.get_message_pieces(
+        identifier_filters=[target_class_filter],
+    )
+
+    print(f"Message pieces sent to {filter_target_class}: {len(target_class_pieces)}")
+    for piece in target_class_pieces:
+        print(f"  [{piece.role}] {piece.converted_value[:80]}")
 
 # %% [markdown]
 # ### Filter by target with partial match
