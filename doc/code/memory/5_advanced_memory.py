@@ -130,7 +130,7 @@ for result in results:
 # %%
 from pyrit.identifiers.identifier_filters import IdentifierFilter, IdentifierType
 
-# Get only the prompts that were sent to TextTarget
+# Get only the prompts that were sent to a specific target
 text_target_filter = IdentifierFilter(
     identifier_type=IdentifierType.TARGET,
     property_path="$.class_name",
