@@ -131,18 +131,18 @@ for result in results:
 from pyrit.identifiers.identifier_filters import IdentifierFilter, IdentifierType
 
 # Get only the prompts that were sent to a specific target
-text_target_filter = IdentifierFilter(
+target_class_filter = IdentifierFilter(
     identifier_type=IdentifierType.TARGET,
     property_path="$.class_name",
     value="TextTarget",
 )
 
-text_target_pieces = memory.get_message_pieces(
-    identifier_filters=[text_target_filter],
+target_class_pieces = memory.get_message_pieces(
+    identifier_filters=[target_class_filter],
 )
 
-print(f"Message pieces sent to TextTarget: {len(text_target_pieces)}")
-for piece in text_target_pieces:
+print(f"Message pieces sent to TextTarget: {len(target_class_pieces)}")
+for piece in target_class_pieces:
     print(f"  [{piece.role}] {piece.converted_value[:80]}")
 
 # %% [markdown]
