@@ -15,7 +15,7 @@
 #
 # 1. **Memory Labels** — free-form key/value tags attached to every prompt, useful for grouping and retrieval.
 # 2. **Identifier Filters** — structured filters that match against the JSON-backed identifier columns
-#    (target, converter, scorer, attack) stored alongside different memory entities, such as `MessagePiece`, `AttackResult`, etc. 
+#    (target, converter, scorer, attack) stored alongside different memory entities, such as `MessagePiece`, `AttackResult`, etc.
 #    This notebook demonstrates the functionality with `MessagePiece` entities, but the concepts are similar for other memory entities.
 # 3. **Score Identifier Filters** — the same `IdentifierFilter` mechanism applied to `memory.get_scores()` for
 #    retrieving scores by scorer identity (class name, custom parameters, etc.).
@@ -254,7 +254,9 @@ from pyrit.score import SubStringScorer
 # Create three scorers with different substrings
 scorer_molotov = SubStringScorer(substring="molotov")
 scorer_launder = SubStringScorer(substring="launder")
-scorer_assist = SubStringScorer(substring="assist")  # intentionally bad scorer that matches when the phrase 'assist' is present in response. But good for demo.
+scorer_assist = SubStringScorer(
+    substring="assist"
+)  # intentionally bad scorer that matches when the phrase 'assist' is present in response. But good for demo.
 
 # Retrieve assistant responses from Part 1
 assistant_pieces = memory.get_message_pieces(
