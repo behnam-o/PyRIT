@@ -24,14 +24,13 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
-def create_message_piece(conversation_id: str, prompt_num: int, targeted_harm_categories=None, labels=None):
-    """Helper function to create MessagePiece with optional targeted harm categories and labels."""
+def create_message_piece(conversation_id: str, prompt_num: int, labels=None):
+    """Helper function to create MessagePiece with optional labels."""
     return MessagePiece(
         role="user",
         original_value=f"Test prompt {prompt_num}",
         converted_value=f"Test prompt {prompt_num}",
         conversation_id=conversation_id,
-        targeted_harm_categories=targeted_harm_categories,
         labels=labels,
     )
 
@@ -721,62 +720,6 @@ def test_update_attack_result_stale_entry_does_not_overwrite(sqlite_instance: Me
     assert results[0].related_conversations.pop().conversation_id == "branch-1"
 
 
-def test_get_attack_results_by_harm_category_single(sqlite_instance: MemoryInterface):
-    """Test filtering attack results by a single harm category."""
-
-    # Create message pieces with harm categories using helper function
-    message_piece1 = create_message_piece("conv_1", 1, targeted_harm_categories=["violence", "illegal"])
-    message_piece2 = create_message_piece("conv_2", 2, targeted_harm_categories=["illegal"])
-    message_piece3 = create_message_piece("conv_3", 3, targeted_harm_categories=["violence"])
-
-    # Add message pieces to memory
-    sqlite_instance.add_message_pieces_to_memory(message_pieces=[message_piece1, message_piece2, message_piece3])
-
-    # Create attack results using helper function
-    attack_result1 = create_attack_result("conv_1", 1, AttackOutcome.SUCCESS)
-    attack_result2 = create_attack_result("conv_2", 2, AttackOutcome.FAILURE)
-    attack_result3 = create_attack_result("conv_3", 3, AttackOutcome.SUCCESS)
-
-    sqlite_instance.add_attack_results_to_memory(attack_results=[attack_result1, attack_result2, attack_result3])
-
-    violence_results = sqlite_instance.get_attack_results(targeted_harm_categories=["violence"])
-    assert len(violence_results) == 2
-    conversation_ids = {result.conversation_id for result in violence_results}
-    assert conversation_ids == {"conv_1", "conv_3"}
-
-    illegal_results = sqlite_instance.get_attack_results(targeted_harm_categories=["illegal"])
-    assert len(illegal_results) == 2
-    conversation_ids = {result.conversation_id for result in illegal_results}
-    assert conversation_ids == {"conv_1", "conv_2"}
-
-
-def test_get_attack_results_by_harm_category_multiple(sqlite_instance: MemoryInterface):
-    """Test filtering attack results by multiple harm categories (AND logic)."""
-
-    # Create message pieces with different harm category combinations
-    message_piece1 = create_message_piece("conv_1", 1, targeted_harm_categories=["violence", "illegal", "hate"])
-    message_piece2 = create_message_piece("conv_2", 2, targeted_harm_categories=["violence", "illegal"])
-    message_piece3 = create_message_piece("conv_3", 3, targeted_harm_categories=["violence"])
-
-    sqlite_instance.add_message_pieces_to_memory(message_pieces=[message_piece1, message_piece2, message_piece3])
-
-    # Create attack results
-    attack_result1 = create_attack_result("conv_1", 1, AttackOutcome.SUCCESS)
-    attack_result2 = create_attack_result("conv_2", 2, AttackOutcome.SUCCESS)
-    attack_result3 = create_attack_result("conv_3", 3, AttackOutcome.FAILURE)
-
-    sqlite_instance.add_attack_results_to_memory(attack_results=[attack_result1, attack_result2, attack_result3])
-
-    # Test filtering by multiple harm categories
-    violence_and_illegal_results = sqlite_instance.get_attack_results(targeted_harm_categories=["violence", "illegal"])
-    assert len(violence_and_illegal_results) == 2
-    conversation_ids = {result.conversation_id for result in violence_and_illegal_results}
-    assert conversation_ids == {"conv_1", "conv_2"}
-    all_three_results = sqlite_instance.get_attack_results(targeted_harm_categories=["violence", "illegal", "hate"])
-    assert len(all_three_results) == 1
-    assert all_three_results[0].conversation_id == "conv_1"
-
-
 def test_get_attack_results_by_labels_single(sqlite_instance: MemoryInterface):
     """Test filtering attack results by single label."""
 
@@ -837,68 +780,6 @@ def test_get_attack_results_by_labels_multiple(sqlite_instance: MemoryInterface)
     assert len(test_op_roakey_results) == 2
     conversation_ids = {result.conversation_id for result in test_op_roakey_results}
     assert conversation_ids == {"conv_1", "conv_2"}
-
-
-def test_get_attack_results_by_harm_category_and_labels(sqlite_instance: MemoryInterface):
-    """Test filtering attack results by both harm categories and labels."""
-
-    # Create message pieces with both harm categories and labels using helper function
-    message_piece1 = create_message_piece(
-        "conv_1",
-        1,
-        targeted_harm_categories=["violence", "illegal"],
-        labels={"operation": "test_op", "operator": "roakey"},
-    )
-    message_piece2 = create_message_piece(
-        "conv_2", 2, targeted_harm_categories=["violence"], labels={"operation": "test_op", "operator": "roakey"}
-    )
-    message_piece3 = create_message_piece(
-        "conv_3",
-        3,
-        targeted_harm_categories=["violence", "illegal"],
-        labels={"operation": "other_op", "operator": "bob"},
-    )
-
-    sqlite_instance.add_message_pieces_to_memory(message_pieces=[message_piece1, message_piece2, message_piece3])
-
-    # Create attack results
-    attack_results = [
-        create_attack_result("conv_1", 1, AttackOutcome.SUCCESS),
-        create_attack_result("conv_2", 2, AttackOutcome.SUCCESS),
-        create_attack_result("conv_3", 3, AttackOutcome.FAILURE),
-    ]
-
-    sqlite_instance.add_attack_results_to_memory(attack_results=attack_results)
-
-    # Test filtering by both harm categories and labels
-    violence_illegal_roakey_results = sqlite_instance.get_attack_results(
-        targeted_harm_categories=["violence", "illegal"], labels={"operator": "roakey"}
-    )
-    assert len(violence_illegal_roakey_results) == 1
-    assert violence_illegal_roakey_results[0].conversation_id == "conv_1"
-
-    # Test filtering by harm category and operation
-    violence_test_op_results = sqlite_instance.get_attack_results(
-        targeted_harm_categories=["violence"], labels={"operation": "test_op"}
-    )
-    assert len(violence_test_op_results) == 2
-    conversation_ids = {result.conversation_id for result in violence_test_op_results}
-    assert conversation_ids == {"conv_1", "conv_2"}
-
-
-def test_get_attack_results_harm_category_no_matches(sqlite_instance: MemoryInterface):
-    """Test filtering by harm category that doesn't exist."""
-
-    # Create attack result without the harm category we'll search for
-    message_piece = create_message_piece("conv_1", 1, targeted_harm_categories=["violence"])
-    sqlite_instance.add_message_pieces_to_memory(message_pieces=[message_piece])
-
-    attack_result = create_attack_result("conv_1", 1, AttackOutcome.SUCCESS)
-    sqlite_instance.add_attack_results_to_memory(attack_results=[attack_result])
-
-    # Search for non-existent harm category
-    results = sqlite_instance.get_attack_results(targeted_harm_categories=["nonexistent"])
-    assert len(results) == 0
 
 
 def test_get_attack_results_labels_no_matches(sqlite_instance: MemoryInterface):

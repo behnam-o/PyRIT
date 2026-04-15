@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Literal, Optional, Union, get_args
+from typing import TYPE_CHECKING, Any, Optional, Union, get_args
 from uuid import uuid4
 
 from pyrit.identifiers.component_identifier import ComponentIdentifier
@@ -13,8 +13,6 @@ from pyrit.models.literals import ChatMessageRole, PromptDataType, PromptRespons
 
 if TYPE_CHECKING:
     from pyrit.models.score import Score
-
-Originator = Literal["attack", "converter", "undefined", "scorer"]
 
 
 class MessagePiece:
@@ -42,15 +40,11 @@ class MessagePiece:
         converter_identifiers: Optional[list[Union[ComponentIdentifier, dict[str, str]]]] = None,
         prompt_target_identifier: Optional[Union[ComponentIdentifier, dict[str, Any]]] = None,
         attack_identifier: Optional[Union[ComponentIdentifier, dict[str, str]]] = None,
-        scorer_identifier: Optional[Union[ComponentIdentifier, dict[str, str]]] = None,
         original_value_data_type: PromptDataType = "text",
         converted_value_data_type: Optional[PromptDataType] = None,
         response_error: PromptResponseError = "none",
-        originator: Originator = "undefined",
         original_prompt_id: Optional[uuid.UUID] = None,
         timestamp: Optional[datetime] = None,
-        scores: Optional[list[Score]] = None,
-        targeted_harm_categories: Optional[list[str]] = None,
     ):
         """
         Initialize a MessagePiece.
@@ -74,16 +68,11 @@ class MessagePiece:
                 objects or dicts (deprecated, will be removed in 0.14.0). Defaults to None.
             prompt_target_identifier: The target identifier for the prompt. Defaults to None.
             attack_identifier: The attack identifier for the prompt. Defaults to None.
-            scorer_identifier: The scorer identifier for the prompt. Can be a ComponentIdentifier or a
-                dict (deprecated, will be removed in 0.13.0). Defaults to None.
             original_value_data_type: The data type of the original prompt (text, image). Defaults to "text".
             converted_value_data_type: The data type of the converted prompt (text, image). Defaults to "text".
             response_error: The response error type. Defaults to "none".
-            originator: The originator of the prompt. Defaults to "undefined".
             original_prompt_id: The original prompt id. It is equal to id unless it is a duplicate. Defaults to None.
             timestamp: The timestamp of the memory entry. Defaults to None (auto-generated).
-            scores: The scores associated with the prompt. Defaults to None.
-            targeted_harm_categories: The harm categories associated with the prompt. Defaults to None.
 
         Raises:
             ValueError: If role, data types, or response error are invalid.
@@ -134,11 +123,6 @@ class MessagePiece:
             ComponentIdentifier.normalize(attack_identifier) if attack_identifier else None
         )
 
-        # Handle scorer_identifier: normalize to ComponentIdentifier (handles dict with deprecation warning)
-        self.scorer_identifier: Optional[ComponentIdentifier] = (
-            ComponentIdentifier.normalize(scorer_identifier) if scorer_identifier else None
-        )
-
         self.original_value = original_value
 
         if original_value_data_type not in get_args(PromptDataType):
@@ -161,13 +145,21 @@ class MessagePiece:
             raise ValueError(f"response_error {response_error} is not a valid response error.")
 
         self.response_error = response_error
-        self.originator = originator
 
         # Original prompt id defaults to id (assumes that this is the original prompt, not a duplicate)
         self.original_prompt_id = original_prompt_id or self.id
 
-        self.scores = scores if scores else []
-        self.targeted_harm_categories = targeted_harm_categories if targeted_harm_categories else []
+        # Scores are not set via constructor. They are hydrated by the memory layer
+        # via _set_scores() after construction.
+        self._scores: list[Score] = []
+
+    @property
+    def scores(self) -> list[Score]:
+        """Scores associated with this message piece, hydrated by the memory layer."""
+        return self._scores
+
+    def _set_scores(self, scores: list[Score]) -> None:
+        self._scores = scores
 
     async def set_sha256_values_async(self) -> None:
         """
@@ -314,14 +306,12 @@ class MessagePiece:
             "sequence": self.sequence,
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
             "labels": self.labels,
-            "targeted_harm_categories": self.targeted_harm_categories if self.targeted_harm_categories else None,
             "prompt_metadata": self.prompt_metadata,
             "converter_identifiers": [conv.to_dict() for conv in self.converter_identifiers],
             "prompt_target_identifier": (
                 self.prompt_target_identifier.to_dict() if self.prompt_target_identifier else None
             ),
             "attack_identifier": self.attack_identifier.to_dict() if self.attack_identifier else None,
-            "scorer_identifier": self.scorer_identifier.to_dict() if self.scorer_identifier else None,
             "original_value_data_type": self.original_value_data_type,
             "original_value": self.original_value,
             "original_value_sha256": self.original_value_sha256,
@@ -329,9 +319,8 @@ class MessagePiece:
             "converted_value": self.converted_value,
             "converted_value_sha256": self.converted_value_sha256,
             "response_error": self.response_error,
-            "originator": self.originator,
             "original_prompt_id": str(self.original_prompt_id),
-            "scores": [score.to_dict() for score in self.scores],
+            "scores": [score.to_dict() for score in self._scores],
         }
 
     def __str__(self) -> str:

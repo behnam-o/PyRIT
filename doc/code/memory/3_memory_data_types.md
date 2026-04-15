@@ -27,9 +27,7 @@ One of the most fundamental data structures in PyRIT is [MessagePiece](../../../
 - **`attack_identifier`**: Information about the attack that generated this prompt
 - **`scorer_identifier`**: Information about the scorer that evaluated this prompt
 - **`response_error`**: Error status (e.g., `none`, `blocked`, `processing`)
-- **`originator`**: Source of the prompt (`attack`, `converter`, `scorer`, `undefined`)
 - **`scores`**: List of `Score` objects associated with this piece
-- **`targeted_harm_categories`**: Harm categories associated with the prompt
 - **`timestamp`**: When the piece was created
 
 This rich context allows PyRIT to track the full lifecycle of each interaction, including transformations, targeting, scoring, and error handling.

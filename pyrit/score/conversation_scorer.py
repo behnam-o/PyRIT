@@ -90,7 +90,6 @@ class ConversationScorer(Scorer, ABC):
                     original_value_data_type=original_piece.original_value_data_type,
                     converted_value_data_type=original_piece.converted_value_data_type,
                     response_error=original_piece.response_error,
-                    originator=original_piece.originator,
                     original_prompt_id=(
                         cast("UUID", original_piece.original_prompt_id)
                         if isinstance(original_piece.original_prompt_id, str)

@@ -404,19 +404,6 @@ class MemoryInterface(abc.ABC):
         """
 
     @abc.abstractmethod
-    def _get_attack_result_harm_category_condition(self, *, targeted_harm_categories: Sequence[str]) -> Any:
-        """
-        Return a database-specific condition for filtering AttackResults by targeted harm categories
-        in the associated PromptMemoryEntry records.
-
-        Args:
-            targeted_harm_categories: List of harm categories that must ALL be present.
-
-        Returns:
-            Database-specific SQLAlchemy condition.
-        """
-
-    @abc.abstractmethod
     def _get_attack_result_label_condition(self, *, labels: dict[str, str]) -> Any:
         """
         Return a database-specific condition for filtering AttackResults by labels
@@ -1478,7 +1465,6 @@ class MemoryInterface(abc.ABC):
         outcome: Optional[str] = None,
         attack_class: Optional[str] = None,
         converter_classes: Optional[Sequence[str]] = None,
-        targeted_harm_categories: Optional[Sequence[str]] = None,
         labels: Optional[dict[str, str]] = None,
         identifier_filters: Optional[Sequence[IdentifierFilter]] = None,
     ) -> Sequence[AttackResult]:
@@ -1497,13 +1483,6 @@ class MemoryInterface(abc.ABC):
                 Defaults to None.
             converter_classes (Optional[Sequence[str]], optional): Filter by converter class names.
                 Returns only attacks that used ALL specified converters (AND logic, case-insensitive).
-                Defaults to None.
-            targeted_harm_categories (Optional[Sequence[str]], optional):
-                A list of targeted harm categories to filter results by.
-                These targeted harm categories are associated with the prompts themselves,
-                meaning they are harm(s) we're trying to elicit with the prompt,
-                not necessarily one(s) that were found in the response.
-                By providing a list, this means ALL categories in the list must be present.
                 Defaults to None.
             labels (Optional[dict[str, str]], optional): A dictionary of memory labels to filter results by.
                 These labels are associated with the prompts themselves, used for custom tagging and tracking.
@@ -1553,12 +1532,6 @@ class MemoryInterface(abc.ABC):
                     array_element_path="$.class_name",
                     array_to_match=converter_classes,
                 )
-            )
-
-        if targeted_harm_categories:
-            # Use database-specific JSON query method
-            conditions.append(
-                self._get_attack_result_harm_category_condition(targeted_harm_categories=targeted_harm_categories)
             )
 
         if labels:

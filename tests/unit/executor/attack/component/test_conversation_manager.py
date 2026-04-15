@@ -872,8 +872,8 @@ class TestInitializeContext:
             original_value="Here is the analysis:",
             original_value_data_type="text",
             conversation_id=piece_conversation_id,
-            scores=[score1],  # Attach score directly to piece
         )
+        piece1._set_scores([score1])
 
         # Create score for second piece
         # Also false since prepended conversations only extract false scores
@@ -892,8 +892,8 @@ class TestInitializeContext:
             original_value="chart_image.png",
             original_value_data_type="image_path",
             conversation_id=piece_conversation_id,
-            scores=[score2],  # Attach score directly to piece
         )
+        piece2._set_scores([score2])
 
         multipart_response = Message(message_pieces=[piece1, piece2])
         context.prepended_conversation = [
@@ -958,16 +958,16 @@ class TestInitializeContext:
             original_value="Simulated success response",
             original_value_data_type="text",
             conversation_id=str(uuid.uuid4()),
-            scores=[true_score],
         )
+        piece_with_true._set_scores([true_score])
 
         piece_with_false = MessagePiece(
             role="assistant",
             original_value="Simulated refusal response",
             original_value_data_type="text",
             conversation_id=str(uuid.uuid4()),
-            scores=[false_score],
         )
+        piece_with_false._set_scores([false_score])
 
         # Test with true score only - should get no scores
         context.prepended_conversation = [
