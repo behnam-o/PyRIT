@@ -446,7 +446,8 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
 
     def _get_attack_result_label_condition(self, *, labels: dict[str, str]) -> Any:
         """
-        Get the SQL Azure implementation for filtering AttackResults by labels.
+        Get the SQL Azure implementation for filtering AttackResults by labels
+        stored directly on the AttackResultEntry.
 
         Uses JSON_VALUE() function specific to SQL Azure with parameterized queries.
 
@@ -454,24 +455,27 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
             labels (dict[str, str]): Dictionary of label key-value pairs to filter by.
 
         Returns:
-            Any: SQLAlchemy exists subquery condition with bound parameters.
+            Any: SQLAlchemy condition with bound parameters.
         """
         # Build JSON conditions for all labels with parameterized queries
         label_conditions = []
         bindparams_dict = {}
-        for key, value in labels.items():
-            param_name = f"label_{key}"
-            label_conditions.append(f"JSON_VALUE(labels, '$.{key}') = :{param_name}")
-            bindparams_dict[param_name] = str(value)
+        for i, (key, value) in enumerate(labels.items()):
+            path_param = f"label_path_{i}"
+            value_param = f"label_val_{i}"
+            label_conditions.append(
+                f'JSON_VALUE("AttackResultEntries".labels, :{path_param}) = :{value_param}'
+            )
+            bindparams_dict[path_param] = f"$.{key}"
+            bindparams_dict[value_param] = str(value)
 
         combined_conditions = " AND ".join(label_conditions)
 
-        return exists().where(
-            and_(
-                PromptMemoryEntry.conversation_id == AttackResultEntry.conversation_id,
-                PromptMemoryEntry.labels.isnot(None),
-                text(f"ISJSON(labels) = 1 AND {combined_conditions}").bindparams(**bindparams_dict),
-            )
+        return and_(
+            AttackResultEntry.labels.isnot(None),
+            text(
+                f'ISJSON("AttackResultEntries".labels) = 1 AND {combined_conditions}'
+            ).bindparams(**bindparams_dict),
         )
 
     def get_unique_attack_class_names(self) -> list[str]:

@@ -420,7 +420,7 @@ class MemoryInterface(abc.ABC):
     def _get_attack_result_label_condition(self, *, labels: dict[str, str]) -> Any:
         """
         Return a database-specific condition for filtering AttackResults by labels
-        in the associated PromptMemoryEntry records.
+        stored directly on the AttackResultEntry.
 
         Args:
             labels: Dictionary of labels that must ALL be present.
@@ -1505,9 +1505,9 @@ class MemoryInterface(abc.ABC):
                 not necessarily one(s) that were found in the response.
                 By providing a list, this means ALL categories in the list must be present.
                 Defaults to None.
-            labels (Optional[dict[str, str]], optional): A dictionary of memory labels to filter results by.
-                These labels are associated with the prompts themselves, used for custom tagging and tracking.
-                Defaults to None.
+            labels (Optional[dict[str, str]], optional): A dictionary of labels to filter results by.
+                These labels are stored directly on the AttackResult. All specified key-value pairs
+                must be present (AND logic). Defaults to None.
             identifier_filters (Optional[Sequence[IdentifierFilter]], optional):
                 A sequence of IdentifierFilter objects that allows filtering by various attack identifier
                 JSON properties. Defaults to None.

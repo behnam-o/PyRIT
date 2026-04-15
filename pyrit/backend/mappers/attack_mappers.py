@@ -197,8 +197,11 @@ def attack_result_to_summary(
     """
     message_count = stats.message_count
     last_preview = stats.last_message_preview
-    labels = dict(stats.labels) if stats.labels else {}
 
+    # Merge attack-result labels with conversation-level labels.
+    # Conversation labels take precedence on key collision.
+    labels = dict(ar.labels) if ar.labels else {}
+    labels.update(stats.labels or {})
     created_str = ar.metadata.get("created_at")
     updated_str = ar.metadata.get("updated_at")
     created_at = datetime.fromisoformat(created_str) if created_str else datetime.now(timezone.utc)

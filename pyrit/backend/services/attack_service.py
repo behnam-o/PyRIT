@@ -308,6 +308,7 @@ class AttackService:
                 "created_at": now.isoformat(),
                 "updated_at": now.isoformat(),
             },
+            labels=labels,
         )
 
         # Store in memory
