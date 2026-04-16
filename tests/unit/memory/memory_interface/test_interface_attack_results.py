@@ -981,6 +981,27 @@ def test_get_attack_results_labels_key_exists_value_mismatch(sqlite_instance: Me
     assert results[0].conversation_id == "conv_1"
 
 
+def test_get_attack_results_by_labels_falls_back_to_conversation_labels(sqlite_instance: MemoryInterface):
+    """Test that label filtering matches via PromptMemoryEntry when AttackResult has no labels."""
+
+    # Attack result with NO labels
+    attack_result = create_attack_result("conv_1", 1, AttackOutcome.SUCCESS, labels={})
+    sqlite_instance.add_attack_results_to_memory(attack_results=[attack_result])
+
+    # Conversation message carries the labels instead
+    message_piece = create_message_piece("conv_1", 1, labels={"operation": "legacy_op"})
+    sqlite_instance.add_message_pieces_to_memory(message_pieces=[message_piece])
+
+    # Should still find the attack result via the PME fallback path
+    results = sqlite_instance.get_attack_results(labels={"operation": "legacy_op"})
+    assert len(results) == 1
+    assert results[0].conversation_id == "conv_1"
+
+    # Non-matching label should return nothing
+    results = sqlite_instance.get_attack_results(labels={"operation": "missing"})
+    assert len(results) == 0
+
+
 # ---------------------------------------------------------------------------
 # get_unique_attack_labels tests
 # ---------------------------------------------------------------------------

@@ -1481,8 +1481,8 @@ class MemoryInterface(abc.ABC):
                 By providing a list, this means ALL categories in the list must be present.
                 Defaults to None.
             labels (Optional[dict[str, str]], optional): A dictionary of labels to filter results by.
-                These labels are stored directly on the AttackResult. All specified key-value pairs
-                must be present (AND logic). Defaults to None.
+                These labels are stored on the AttackResult or associated PromptMemoryEntry (via conversation_id)
+                . All specified key-value pairs must be present (AND logic). Defaults to None.
             identifier_filters (Optional[Sequence[IdentifierFilter]], optional):
                 A sequence of IdentifierFilter objects that allows filtering by various attack identifier
                 JSON properties. Defaults to None.
