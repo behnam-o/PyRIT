@@ -463,9 +463,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         for i, (key, value) in enumerate(labels.items()):
             path_param = f"label_path_{i}"
             value_param = f"label_val_{i}"
-            label_conditions.append(
-                f'JSON_VALUE("AttackResultEntries".labels, :{path_param}) = :{value_param}'
-            )
+            label_conditions.append(f'JSON_VALUE("AttackResultEntries".labels, :{path_param}) = :{value_param}')
             bindparams_dict[path_param] = f"$.{key}"
             bindparams_dict[value_param] = str(value)
 
@@ -473,9 +471,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
 
         return and_(
             AttackResultEntry.labels.isnot(None),
-            text(
-                f'ISJSON("AttackResultEntries".labels) = 1 AND {combined_conditions}'
-            ).bindparams(**bindparams_dict),
+            text(f'ISJSON("AttackResultEntries".labels) = 1 AND {combined_conditions}').bindparams(**bindparams_dict),
         )
 
     def get_unique_attack_class_names(self) -> list[str]:

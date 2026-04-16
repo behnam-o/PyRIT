@@ -814,15 +814,21 @@ def test_get_attack_results_by_labels_multiple(sqlite_instance: MemoryInterface)
     # Create attack results with multiple labels
     attack_results = [
         create_attack_result(
-            "conv_1", 1, AttackOutcome.SUCCESS,
+            "conv_1",
+            1,
+            AttackOutcome.SUCCESS,
             labels={"operation": "test_op", "operator": "roakey", "phase": "initial"},
         ),
         create_attack_result(
-            "conv_2", 2, AttackOutcome.SUCCESS,
+            "conv_2",
+            2,
+            AttackOutcome.SUCCESS,
             labels={"operation": "test_op", "operator": "roakey", "phase": "final"},
         ),
         create_attack_result(
-            "conv_3", 3, AttackOutcome.FAILURE,
+            "conv_3",
+            3,
+            AttackOutcome.FAILURE,
             labels={"operation": "test_op", "phase": "initial"},
         ),
     ]
@@ -852,15 +858,9 @@ def test_get_attack_results_by_harm_category_and_labels(sqlite_instance: MemoryI
 
     # Create attack results with labels
     attack_results = [
-        create_attack_result(
-            "conv_1", 1, AttackOutcome.SUCCESS, labels={"operation": "test_op", "operator": "roakey"}
-        ),
-        create_attack_result(
-            "conv_2", 2, AttackOutcome.SUCCESS, labels={"operation": "test_op", "operator": "roakey"}
-        ),
-        create_attack_result(
-            "conv_3", 3, AttackOutcome.FAILURE, labels={"operation": "other_op", "operator": "bob"}
-        ),
+        create_attack_result("conv_1", 1, AttackOutcome.SUCCESS, labels={"operation": "test_op", "operator": "roakey"}),
+        create_attack_result("conv_2", 2, AttackOutcome.SUCCESS, labels={"operation": "test_op", "operator": "roakey"}),
+        create_attack_result("conv_3", 3, AttackOutcome.FAILURE, labels={"operation": "other_op", "operator": "bob"}),
     ]
 
     sqlite_instance.add_attack_results_to_memory(attack_results=attack_results)
