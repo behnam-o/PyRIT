@@ -25,7 +25,6 @@ One of the most fundamental data structures in PyRIT is [MessagePiece](../../../
 - **`converter_identifiers`**: List of converters applied to transform the prompt
 - **`prompt_target_identifier`**: Information about the target that received this prompt
 - **`attack_identifier`**: Information about the attack that generated this prompt
-- **`scorer_identifier`**: Information about the scorer that evaluated this prompt
 - **`response_error`**: Error status (e.g., `none`, `blocked`, `processing`)
 - **`scores`**: List of `Score` objects associated with this piece
 - **`timestamp`**: When the piece was created
