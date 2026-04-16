@@ -110,7 +110,6 @@ def get_adversarial_chat_messages(
                 conversation_id=adversarial_chat_conversation_id,
                 attack_identifier=attack_identifier,
                 prompt_target_identifier=adversarial_chat_target_identifier,
-                labels=labels,
             )
 
             result.append(adversarial_piece.to_message())
@@ -260,7 +259,6 @@ class ConversationManager:
             system_prompt=system_prompt,
             conversation_id=conversation_id,
             attack_identifier=self._attack_identifier,
-            labels=labels,
         )
 
     async def initialize_context_async(

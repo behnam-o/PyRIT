@@ -155,7 +155,6 @@ class PromptMemoryEntry(Base):
         sequence (int): The order of the conversation within a conversation_id.
             Can be the same number for multi-part requests or multi-part responses.
         timestamp (DateTime): The timestamp of the memory entry.
-        labels (Dict[str, str]): The labels associated with the memory entry. Several can be standardized.
         targeted_harm_categories (List[str]): The targeted harm categories for the memory entry.
         prompt_metadata (JSON): The metadata associated with the prompt. This can be specific to any scenarios.
             Because memory is how components talk with each other, this can be component specific.
@@ -186,7 +185,6 @@ class PromptMemoryEntry(Base):
     conversation_id = mapped_column(String, nullable=False)
     sequence = mapped_column(INTEGER, nullable=False)
     timestamp = mapped_column(DateTime, nullable=False)
-    labels: Mapped[dict[str, str]] = mapped_column(JSON)
     prompt_metadata: Mapped[dict[str, Union[str, int]]] = mapped_column(JSON)
     targeted_harm_categories: Mapped[Optional[list[str]]] = mapped_column(JSON)
     converter_identifiers: Mapped[Optional[list[dict[str, str]]]] = mapped_column(JSON)
@@ -221,6 +219,42 @@ class PromptMemoryEntry(Base):
         foreign_keys="ScoreEntry.prompt_request_response_id",
     )
 
+    def get_attack_result_entries(self) -> list["AttackResultEntry"]:
+        """
+        Return all AttackResultEntry rows whose attack owns this conversation.
+
+        Matches on the main conversation_id as well as any related conversation
+        (pruned, adversarial, etc.) without hard-coding specific JSON column names.
+        The SQL query fetches candidates, then ``AttackResult.includes_conversation``
+        is used as the authoritative Python-level filter so that new conversation
+        types are automatically covered.
+
+        Returns:
+            list of AttackResultEntry rows whose attack owns this conversation.
+
+        """
+        from sqlalchemy import inspect as sa_inspect
+
+        session = sa_inspect(self).session
+        if session is None:
+            return []
+
+        # Fetch candidate rows: direct conversation_id match, or any row
+        # whose full text representation contains this conversation_id.
+        candidates = (
+            session.query(AttackResultEntry).filter(AttackResultEntry.conversation_id == self.conversation_id).all()
+        )
+
+        if not candidates:
+            # Broader search: all rows, filtered by the model's own logic.
+            candidates = [
+                e
+                for e in session.query(AttackResultEntry).all()
+                if e.get_attack_result().includes_conversation(self.conversation_id)
+            ]
+
+        return candidates
+
     def __init__(self, *, entry: MessagePiece):
         """
         Initialize a PromptMemoryEntry from a MessagePiece.
@@ -233,7 +267,6 @@ class PromptMemoryEntry(Base):
         self.conversation_id = entry.conversation_id
         self.sequence = entry.sequence
         self.timestamp = entry.timestamp
-        self.labels = entry.labels
         self.prompt_metadata = entry.prompt_metadata
         self.targeted_harm_categories = entry.targeted_harm_categories
         self.converter_identifiers = [
@@ -301,7 +334,6 @@ class PromptMemoryEntry(Base):
             id=self.id,
             conversation_id=self.conversation_id,
             sequence=self.sequence,
-            labels=self.labels,
             prompt_metadata=self.prompt_metadata,
             targeted_harm_categories=self.targeted_harm_categories,
             converter_identifiers=converter_ids,
@@ -314,6 +346,10 @@ class PromptMemoryEntry(Base):
             timestamp=_ensure_utc(self.timestamp),
         )
         message_piece.scores = [score.get_score() for score in self.scores]
+        attack_entries = self.get_attack_result_entries()
+
+        # message_piece._set_labels([e.get_attack_result().labels for e in attack_entries])  # noqa: ERA001
+
         return message_piece
 
     def __str__(self) -> str:

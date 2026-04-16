@@ -213,7 +213,6 @@ class AnecdoctorGenerator(
             system_prompt=system_prompt,
             conversation_id=context.conversation_id,
             attack_identifier=self.get_identifier(),
-            labels=context.memory_labels,
         )
 
     async def _perform_async(self, *, context: AnecdoctorContext) -> AnecdoctorResult:
@@ -305,7 +304,6 @@ class AnecdoctorGenerator(
             conversation_id=context.conversation_id,
             request_converter_configurations=self._request_converters,
             response_converter_configurations=self._response_converters,
-            labels=context.memory_labels,
             attack_identifier=self.get_identifier(),
         )
 
@@ -374,7 +372,6 @@ class AnecdoctorGenerator(
             system_prompt=kg_system_prompt,
             conversation_id=kg_conversation_id,
             attack_identifier=self.get_identifier(),
-            labels=self._memory_labels,
         )
 
         # Format examples for knowledge graph extraction using few-shot format
@@ -390,7 +387,6 @@ class AnecdoctorGenerator(
             conversation_id=kg_conversation_id,
             request_converter_configurations=self._request_converters,
             response_converter_configurations=self._response_converters,
-            labels=self._memory_labels,
             attack_identifier=self.get_identifier(),
         )
 

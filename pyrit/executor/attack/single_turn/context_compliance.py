@@ -235,7 +235,6 @@ class ContextComplianceAttack(PromptSendingAttack):
             message=message,
             target=self._adversarial_chat,
             attack_identifier=self.get_identifier(),
-            labels=context.memory_labels,
         )
 
         return response.get_value()
@@ -262,7 +261,6 @@ class ContextComplianceAttack(PromptSendingAttack):
             message=message,
             target=self._adversarial_chat,
             attack_identifier=self.get_identifier(),
-            labels=context.memory_labels,
         )
 
         return response.get_value()
@@ -287,7 +285,6 @@ class ContextComplianceAttack(PromptSendingAttack):
             message=message,
             target=self._adversarial_chat,
             attack_identifier=self.get_identifier(),
-            labels=context.memory_labels,
         )
 
         return response.get_value()

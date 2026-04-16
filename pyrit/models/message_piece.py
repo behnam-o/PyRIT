@@ -37,7 +37,6 @@ class MessagePiece:
         id: Optional[uuid.UUID | str] = None,  # noqa: A002
         conversation_id: Optional[str] = None,
         sequence: int = -1,
-        labels: Optional[dict[str, str]] = None,
         prompt_metadata: Optional[dict[str, Union[str, int]]] = None,
         converter_identifiers: Optional[list[Union[ComponentIdentifier, dict[str, str]]]] = None,
         prompt_target_identifier: Optional[Union[ComponentIdentifier, dict[str, Any]]] = None,
@@ -65,7 +64,6 @@ class MessagePiece:
             conversation_id: The identifier for the conversation which is associated with a single target.
                 Defaults to None.
             sequence: The order of the conversation within a conversation_id. Defaults to -1.
-            labels: The labels associated with the memory entry. Several can be standardized. Defaults to None.
             prompt_metadata: The metadata associated with the prompt. This can be specific to any scenarios.
                 Because memory is how components talk with each other, this can be component specific.
                 e.g. the URI from a file uploaded to a blob store, or a document type you want to upload.
@@ -114,7 +112,6 @@ class MessagePiece:
             self.timestamp = timestamp.replace(tzinfo=timezone.utc)
         else:
             self.timestamp = timestamp
-        self.labels = labels or {}
         self.prompt_metadata = prompt_metadata or {}
 
         # Handle converter_identifiers: normalize to ComponentIdentifier (handles dict with deprecation warning)
@@ -168,6 +165,16 @@ class MessagePiece:
 
         self.scores = scores if scores else []
         self.targeted_harm_categories = targeted_harm_categories if targeted_harm_categories else []
+
+        self._labels: dict[str, str] = {}
+
+    @property
+    def labels(self) -> dict[str, str]:
+        """Labels associated with this message piece, hydrated by the memory layer."""
+        return self._labels
+
+    def _set_labels(self, labels: dict[str, str]) -> None:
+        self._labels = labels
 
     async def set_sha256_values_async(self) -> None:
         """

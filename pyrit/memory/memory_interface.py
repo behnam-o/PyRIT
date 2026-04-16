@@ -1569,11 +1569,9 @@ class MemoryInterface(abc.ABC):
         """
         Return all unique label key-value pairs across attack results.
 
-        Labels live on ``PromptMemoryEntry.labels`` (the established SDK
-        path).  This method JOINs with ``AttackResultEntry`` to scope the
-        query to conversations that belong to an attack, applies DISTINCT
-        to reduce duplicate label dicts, then aggregates unique key-value
-        pairs in Python.
+        Labels live directly on ``AttackResultEntry.labels``. This method
+        queries distinct label dicts from attack results, then aggregates
+        unique key-value pairs in Python.
 
         Returns:
             dict[str, list[str]]: Mapping of label keys to sorted lists of
@@ -1582,16 +1580,7 @@ class MemoryInterface(abc.ABC):
         label_values: dict[str, set[str]] = {}
 
         with closing(self.get_session()) as session:
-            rows = (
-                session.query(PromptMemoryEntry.labels)
-                .join(
-                    AttackResultEntry,
-                    PromptMemoryEntry.conversation_id == AttackResultEntry.conversation_id,
-                )
-                .filter(PromptMemoryEntry.labels.isnot(None))
-                .distinct()
-                .all()
-            )
+            rows = session.query(AttackResultEntry.labels).filter(AttackResultEntry.labels.isnot(None)).distinct().all()
 
         for (labels,) in rows:
             if not isinstance(labels, dict):

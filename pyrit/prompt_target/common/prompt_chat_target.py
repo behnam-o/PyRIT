@@ -70,7 +70,6 @@ class PromptChatTarget(PromptTarget):
         system_prompt: str,
         conversation_id: str,
         attack_identifier: Optional[ComponentIdentifier] = None,
-        labels: Optional[dict[str, str]] = None,
     ) -> None:
         """
         Set the system prompt for the prompt target. May be overridden by subclasses.
@@ -91,7 +90,6 @@ class PromptChatTarget(PromptTarget):
                 converted_value=system_prompt,
                 prompt_target_identifier=self.get_identifier(),
                 attack_identifier=attack_identifier,
-                labels=labels,
             ).to_message()
         )
 

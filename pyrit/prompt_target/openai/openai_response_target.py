@@ -683,7 +683,6 @@ class OpenAIResponseTarget(OpenAITarget, PromptChatTarget):
             role="assistant",
             original_value=piece_value,
             conversation_id=message_piece.conversation_id,
-            labels=message_piece.labels,
             prompt_target_identifier=message_piece.prompt_target_identifier,
             attack_identifier=message_piece.attack_identifier,
             original_value_data_type=piece_type,
@@ -791,7 +790,6 @@ class OpenAIResponseTarget(OpenAITarget, PromptChatTarget):
             ),
             original_value_data_type="function_call_output",
             conversation_id=reference_piece.conversation_id,
-            labels={"call_id": call_id},
             prompt_target_identifier=reference_piece.prompt_target_identifier,
             attack_identifier=reference_piece.attack_identifier,
         )

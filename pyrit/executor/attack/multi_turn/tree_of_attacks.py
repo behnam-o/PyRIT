@@ -540,7 +540,6 @@ class _TreeOfAttacksNode:
                 response_converter_configurations=self._response_converters,
                 conversation_id=self.objective_target_conversation_id,
                 target=self._objective_target,
-                labels=self._memory_labels,
                 attack_identifier=self._attack_id,
             )
 
@@ -596,7 +595,6 @@ class _TreeOfAttacksNode:
                 response_converter_configurations=self._response_converters,
                 conversation_id=self.objective_target_conversation_id,
                 target=self._objective_target,
-                labels=self._memory_labels,
                 attack_identifier=self._attack_id,
             )
 
@@ -982,7 +980,6 @@ class _TreeOfAttacksNode:
             system_prompt=system_prompt,
             conversation_id=self.adversarial_chat_conversation_id,
             attack_identifier=self._attack_id,
-            labels=self._memory_labels,
         )
 
         logger.debug(f"Node {self.node_id}: Using initial seed prompt for first turn")
@@ -1107,7 +1104,6 @@ class _TreeOfAttacksNode:
                 message=message,
                 conversation_id=self.adversarial_chat_conversation_id,
                 target=self._adversarial_chat,
-                labels=self._memory_labels,
                 attack_identifier=self._attack_id,
             )
 

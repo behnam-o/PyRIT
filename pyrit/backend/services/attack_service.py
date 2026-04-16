@@ -286,7 +286,6 @@ class AttackService:
             conversation_id = self._duplicate_conversation_up_to(
                 source_conversation_id=request.source_conversation_id,
                 cutoff_index=request.cutoff_index,
-                labels_override=labels,
                 remap_assistant_to_simulated=True,
             )
         else:
@@ -319,7 +318,6 @@ class AttackService:
             await self._store_prepended_messages(
                 conversation_id=conversation_id,
                 prepended=request.prepended_conversation,
-                labels=labels,
             )
 
         return CreateAttackResponse(
@@ -802,7 +800,6 @@ class AttackService:
         *,
         source_conversation_id: str,
         cutoff_index: int,
-        labels_override: Optional[dict[str, str]] = None,
         remap_assistant_to_simulated: bool = False,
     ) -> str:
         """
@@ -815,9 +812,6 @@ class AttackService:
         Args:
             source_conversation_id: The conversation to copy from.
             cutoff_index: Include messages with sequence <= cutoff_index.
-            labels_override: When provided, the duplicated pieces' labels are
-                replaced with these values.  Used when branching into a new
-                attack that belongs to a different operator.
             remap_assistant_to_simulated: When True, pieces with role
                 ``assistant`` are changed to ``simulated_assistant`` so the
                 branched context is inert and won't confuse the target.
@@ -832,8 +826,6 @@ class AttackService:
 
         # Apply optional overrides to the fresh pieces before persisting
         for piece in all_pieces:
-            if labels_override is not None:
-                piece.labels = dict(labels_override)
             if remap_assistant_to_simulated and piece.api_role == "assistant":
                 piece._role = "simulated_assistant"
 
@@ -924,7 +916,6 @@ class AttackService:
         self,
         conversation_id: str,
         prepended: list[Any],
-        labels: Optional[dict[str, str]] = None,
     ) -> None:
         """Store prepended conversation messages in memory."""
         for seq, msg in enumerate(prepended):
@@ -934,7 +925,6 @@ class AttackService:
                     role=msg.role,
                     conversation_id=conversation_id,
                     sequence=seq,
-                    labels=labels,
                 )
                 self._memory.add_message_pieces_to_memory(message_pieces=[piece])
 
@@ -960,7 +950,6 @@ class AttackService:
             request=request,
             conversation_id=conversation_id,
             sequence=sequence,
-            labels=labels,
         )
 
         converter_configs = self._get_converter_configs(request)
@@ -971,7 +960,6 @@ class AttackService:
             target=target_obj,
             conversation_id=conversation_id,
             request_converter_configurations=converter_configs,
-            labels=labels,
         )
         # PromptNormalizer stores both request and response in memory automatically
 
@@ -991,7 +979,6 @@ class AttackService:
                 role=request.role,
                 conversation_id=conversation_id,
                 sequence=sequence,
-                labels=labels,
             )
             self._memory.add_message_pieces_to_memory(message_pieces=[piece])
 

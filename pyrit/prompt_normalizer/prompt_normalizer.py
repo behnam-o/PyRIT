@@ -53,7 +53,6 @@ class PromptNormalizer:
         conversation_id: Optional[str] = None,
         request_converter_configurations: list[PromptConverterConfiguration] | None = None,
         response_converter_configurations: list[PromptConverterConfiguration] | None = None,
-        labels: Optional[dict[str, str]] = None,
         attack_identifier: Optional[ComponentIdentifier] = None,
     ) -> Message:
         """
@@ -67,7 +66,6 @@ class PromptNormalizer:
                 converting the request. Defaults to an empty list.
             response_converter_configurations (list[PromptConverterConfiguration], optional): Configurations for
                 converting the response. Defaults to an empty list.
-            labels (Optional[dict[str, str]], optional): Labels associated with the request. Defaults to None.
             attack_identifier (Optional[ComponentIdentifier], optional): Identifier for the attack. Defaults to
                 None.
 
@@ -90,8 +88,6 @@ class PromptNormalizer:
 
         for piece in request.message_pieces:
             piece.conversation_id = conversation_id
-            if labels:
-                piece.labels = labels
             piece.prompt_target_identifier = target.get_identifier()
             if attack_identifier:
                 piece.attack_identifier = attack_identifier

@@ -334,7 +334,6 @@ class XPIAWorkflow(WorkflowStrategy[XPIAContext, XPIAResult], Identifiable):
             request_converter_configurations=self._request_converters,
             response_converter_configurations=self._response_converters,
             target=self._attack_setup_target,
-            labels=context.memory_labels,
             attack_identifier=self.get_identifier(),
             conversation_id=context.attack_setup_target_conversation_id,
         )
@@ -566,7 +565,6 @@ class XPIATestWorkflow(XPIAWorkflow):
                 target=self._processing_target,
                 request_converter_configurations=self._request_converters,
                 response_converter_configurations=self._response_converters,
-                labels=context.memory_labels,
                 attack_identifier=self.get_identifier(),
                 conversation_id=context.processing_conversation_id,
             )

@@ -256,7 +256,6 @@ class RedTeamingAttack(MultiTurnAttackStrategy[MultiTurnAttackContext[Any], Atta
             system_prompt=adversarial_system_prompt,
             conversation_id=context.session.adversarial_chat_conversation_id,
             attack_identifier=self.get_identifier(),
-            labels=context.memory_labels,
         )
 
     async def _perform_async(self, *, context: MultiTurnAttackContext[Any]) -> AttackResult:
@@ -379,7 +378,6 @@ class RedTeamingAttack(MultiTurnAttackStrategy[MultiTurnAttackContext[Any], Atta
                 conversation_id=context.session.adversarial_chat_conversation_id,
                 target=self._adversarial_chat,
                 attack_identifier=self.get_identifier(),
-                labels=context.memory_labels,
             )
 
         # Check if the response is valid
@@ -543,7 +541,6 @@ class RedTeamingAttack(MultiTurnAttackStrategy[MultiTurnAttackContext[Any], Atta
                 request_converter_configurations=self._request_converters,
                 response_converter_configurations=self._response_converters,
                 target=self._objective_target,
-                labels=context.memory_labels,
                 attack_identifier=self.get_identifier(),
             )
 
