@@ -870,26 +870,6 @@ def test_message_piece_has_error_and_is_blocked_consistency():
     assert no_error_entry.has_error() is False
 
 
-def test_message_piece_scorer_identifier_deprecation_warning():
-    with pytest.deprecated_call():
-        MessagePiece(role="user", original_value="Hello", scorer_identifier={"class_name": "X", "class_module": "y"})
-
-
-def test_message_piece_originator_deprecation_warning():
-    with pytest.deprecated_call():
-        MessagePiece(role="user", original_value="Hello", originator="attack")
-
-
-def test_message_piece_targeted_harm_categories_deprecation_warning():
-    with pytest.deprecated_call():
-        MessagePiece(role="user", original_value="Hello", targeted_harm_categories=["violence"])
-
-
-def test_message_piece_scores_parameter_deprecation_warning():
-    with pytest.deprecated_call():
-        MessagePiece(role="user", original_value="Hello", scores=[])
-
-
 class TestSimulatedAssistantRole:
     """Tests for simulated_assistant role properties."""
 

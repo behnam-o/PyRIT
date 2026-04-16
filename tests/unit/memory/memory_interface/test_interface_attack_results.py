@@ -5,8 +5,6 @@
 import uuid
 from typing import TYPE_CHECKING, Optional
 
-import pytest
-
 from pyrit.common.utils import to_sha256
 from pyrit.identifiers import ComponentIdentifier
 from pyrit.identifiers.atomic_attack_identifier import build_atomic_attack_identifier
@@ -782,12 +780,6 @@ def test_get_attack_results_by_labels_multiple(sqlite_instance: MemoryInterface)
     assert len(test_op_roakey_results) == 2
     conversation_ids = {result.conversation_id for result in test_op_roakey_results}
     assert conversation_ids == {"conv_1", "conv_2"}
-
-
-def test_get_attack_results_targeted_harm_categories_deprecation_warning(sqlite_instance: MemoryInterface):
-    """Test that passing targeted_harm_categories emits a DeprecationWarning."""
-    with pytest.deprecated_call():
-        sqlite_instance.get_attack_results(targeted_harm_categories=["violence"])
 
 
 def test_get_attack_results_labels_no_matches(sqlite_instance: MemoryInterface):
