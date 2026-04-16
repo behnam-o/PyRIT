@@ -9,7 +9,7 @@ from contextlib import closing, suppress
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
 
-from sqlalchemy import and_, create_engine, event, exists, text
+from sqlalchemy import and_, create_engine, event, exists, or_, text
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import InstrumentedAttribute, joinedload, sessionmaker
@@ -446,8 +446,10 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
 
     def _get_attack_result_label_condition(self, *, labels: dict[str, str]) -> Any:
         """
-        Get the SQL Azure implementation for filtering AttackResults by labels
-        stored directly on the AttackResultEntry.
+        Get the SQL Azure implementation for filtering AttackResults by labels.
+
+        Matches if the labels are found on the AttackResultEntry directly
+        OR on an associated PromptMemoryEntry (via conversation_id).
 
         Uses JSON_VALUE() function specific to SQL Azure with parameterized queries.
 
@@ -457,22 +459,46 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         Returns:
             Any: SQLAlchemy condition with bound parameters.
         """
-        # Build JSON conditions for all labels with parameterized queries
-        label_conditions = []
-        bindparams_dict = {}
+        # --- Direct match on AttackResultEntry.labels ---
+        ar_label_conditions = []
+        ar_bindparams: dict[str, str] = {}
         for i, (key, value) in enumerate(labels.items()):
-            path_param = f"label_path_{i}"
-            value_param = f"label_val_{i}"
-            label_conditions.append(f'JSON_VALUE("AttackResultEntries".labels, :{path_param}) = :{value_param}')
-            bindparams_dict[path_param] = f"$.{key}"
-            bindparams_dict[value_param] = str(value)
+            path_param = f"ar_label_path_{i}"
+            value_param = f"ar_label_val_{i}"
+            ar_label_conditions.append(
+                f'JSON_VALUE("AttackResultEntries".labels, :{path_param}) = :{value_param}'
+            )
+            ar_bindparams[path_param] = f"$.{key}"
+            ar_bindparams[value_param] = str(value)
 
-        combined_conditions = " AND ".join(label_conditions)
-
-        return and_(
+        ar_combined = " AND ".join(ar_label_conditions)
+        direct_condition = and_(
             AttackResultEntry.labels.isnot(None),
-            text(f'ISJSON("AttackResultEntries".labels) = 1 AND {combined_conditions}').bindparams(**bindparams_dict),
+            text(
+                f'ISJSON("AttackResultEntries".labels) = 1 AND {ar_combined}'
+            ).bindparams(**ar_bindparams),
         )
+
+        # --- Conversation-level match on PromptMemoryEntry.labels ---
+        pme_label_conditions = []
+        pme_bindparams: dict[str, str] = {}
+        for i, (key, value) in enumerate(labels.items()):
+            param_name = f"pme_label_{key}"
+            pme_label_conditions.append(f"JSON_VALUE(labels, '$.{key}') = :{param_name}")
+            pme_bindparams[param_name] = str(value)
+
+        pme_combined = " AND ".join(pme_label_conditions)
+        conversation_condition = exists().where(
+            and_(
+                PromptMemoryEntry.conversation_id == AttackResultEntry.conversation_id,
+                PromptMemoryEntry.labels.isnot(None),
+                text(
+                    f"ISJSON(labels) = 1 AND {pme_combined}"
+                ).bindparams(**pme_bindparams),
+            )
+        )
+
+        return or_(direct_condition, conversation_condition)
 
     def get_unique_attack_class_names(self) -> list[str]:
         """
