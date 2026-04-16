@@ -149,6 +149,10 @@ class MessagePiece:
         # Original prompt id defaults to id (assumes that this is the original prompt, not a duplicate)
         self.original_prompt_id = original_prompt_id or self.id
 
+        # Scores are not set via constructor. They are hydrated by the memory layer
+        # via _set_scores() after construction.
+        self._scores: list[Score] = []
+
     @property
     def scores(self) -> list[Score]:
         """Scores associated with this message piece, hydrated by the memory layer."""
