@@ -320,7 +320,7 @@ class MessagePiece:
             "converted_value_sha256": self.converted_value_sha256,
             "response_error": self.response_error,
             "original_prompt_id": str(self.original_prompt_id),
-            "scores": [score.to_dict() for score in self._scores],
+            "scores": [score.to_dict() for score in self.scores],
         }
 
     def __str__(self) -> str:
