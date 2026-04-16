@@ -226,6 +226,25 @@ def test_get_memories_with_attack_id(memory_interface: AzureSQLMemory):
     pytest.skip("Test requires Azure SQL-specific JSON functions; covered by integration tests")
 
 
+def test_get_attack_result_label_condition_single_label(memory_interface: AzureSQLMemory):
+    """Test that _get_attack_result_label_condition builds a valid condition for a single label."""
+    condition = memory_interface._get_attack_result_label_condition(labels={"operation": "test_op"})
+    compiled = str(condition.compile(compile_kwargs={"literal_binds": False}))
+    assert "JSON_VALUE" in compiled
+    assert "ISJSON" in compiled
+
+
+def test_get_attack_result_label_condition_multiple_labels(memory_interface: AzureSQLMemory):
+    """Test that _get_attack_result_label_condition builds a valid condition for multiple labels."""
+    condition = memory_interface._get_attack_result_label_condition(
+        labels={"operation": "test_op", "operator": "roakey"}
+    )
+    compiled = str(condition.compile(compile_kwargs={"literal_binds": False}))
+    # Both AR-direct and PME-conversation branches should appear
+    assert "AttackResultEntries" in compiled
+    assert "PromptMemoryEntries" in compiled
+
+
 def test_update_entries(memory_interface: AzureSQLMemory):
     # Insert a test entry
     entry = PromptMemoryEntry(
