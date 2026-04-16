@@ -156,7 +156,7 @@ class MessagePiece:
     @property
     def scores(self) -> list[Score]:
         """Scores associated with this message piece, hydrated by the memory layer."""
-        return self._scores
+        return list(self._scores)
 
     def _set_scores(self, scores: list[Score]) -> None:
         self._scores = scores
