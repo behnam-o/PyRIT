@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import uuid
+import warnings
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Optional, Union, get_args
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union, get_args
 from uuid import uuid4
 
 from pyrit.identifiers.component_identifier import ComponentIdentifier
@@ -13,6 +14,9 @@ from pyrit.models.literals import ChatMessageRole, PromptDataType, PromptRespons
 
 if TYPE_CHECKING:
     from pyrit.models.score import Score
+
+Originator = Literal["attack", "converter", "undefined", "scorer"]
+"""Deprecated: Will be removed in 0.15.0."""
 
 
 class MessagePiece:
@@ -45,6 +49,11 @@ class MessagePiece:
         response_error: PromptResponseError = "none",
         original_prompt_id: Optional[uuid.UUID] = None,
         timestamp: Optional[datetime] = None,
+        # Deprecated parameters — accepted but ignored. Will be removed in 0.15.0.
+        scorer_identifier: Optional[Union[ComponentIdentifier, dict[str, str]]] = None,
+        originator: Optional[str] = None,
+        scores: Optional[list[Score]] = None,
+        targeted_harm_categories: Optional[list[str]] = None,
     ):
         """
         Initialize a MessagePiece.
@@ -73,6 +82,10 @@ class MessagePiece:
             response_error: The response error type. Defaults to "none".
             original_prompt_id: The original prompt id. It is equal to id unless it is a duplicate. Defaults to None.
             timestamp: The timestamp of the memory entry. Defaults to None (auto-generated).
+            scorer_identifier: Deprecated, will be removed in 0.15.0.
+            originator: Deprecated, will be removed in 0.15.0.
+            scores: Deprecated, use _set_scores() instead. Will be removed in 0.15.0.
+            targeted_harm_categories: Deprecated, will be removed in 0.15.0.
 
         Raises:
             ValueError: If role, data types, or response error are invalid.
@@ -149,9 +162,35 @@ class MessagePiece:
         # Original prompt id defaults to id (assumes that this is the original prompt, not a duplicate)
         self.original_prompt_id = original_prompt_id or self.id
 
+        # Emit deprecation warnings for removed parameters
+        if scorer_identifier is not None:
+            warnings.warn(
+                "scorer_identifier is deprecated and will be removed in 0.15.0.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if originator is not None:
+            warnings.warn(
+                "originator is deprecated and will be removed in 0.15.0.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if targeted_harm_categories is not None:
+            warnings.warn(
+                "targeted_harm_categories is deprecated and will be removed in 0.15.0.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if scores is not None:
+            warnings.warn(
+                "scores parameter is deprecated. Use _set_scores() instead. Will be removed in 0.15.0.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         # Scores are not set via constructor. They are hydrated by the memory layer
         # via _set_scores() after construction.
-        self._scores: list[Score] = []
+        self._scores: list[Score] = scores if scores else []
 
     @property
     def scores(self) -> list[Score]:

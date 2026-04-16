@@ -1467,6 +1467,8 @@ class MemoryInterface(abc.ABC):
         converter_classes: Optional[Sequence[str]] = None,
         labels: Optional[dict[str, str]] = None,
         identifier_filters: Optional[Sequence[IdentifierFilter]] = None,
+        # Deprecated — accepted but ignored. Will be removed in 0.15.0.
+        targeted_harm_categories: Optional[Sequence[str]] = None,
     ) -> Sequence[AttackResult]:
         """
         Retrieve a list of AttackResult objects based on the specified filters.
@@ -1487,6 +1489,7 @@ class MemoryInterface(abc.ABC):
             labels (Optional[dict[str, str]], optional): A dictionary of memory labels to filter results by.
                 These labels are associated with the prompts themselves, used for custom tagging and tracking.
                 Defaults to None.
+            targeted_harm_categories: Deprecated, will be removed in 0.15.0.
             identifier_filters (Optional[Sequence[IdentifierFilter]], optional):
                 A sequence of IdentifierFilter objects that allows filtering by various attack identifier
                 JSON properties. Defaults to None.
@@ -1494,6 +1497,13 @@ class MemoryInterface(abc.ABC):
         Returns:
             Sequence[AttackResult]: A list of AttackResult objects that match the specified filters.
         """
+        if targeted_harm_categories is not None:
+            warnings.warn(
+                "targeted_harm_categories is deprecated and will be removed in 0.15.0.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         conditions: list[ColumnElement[bool]] = []
 
         if attack_result_ids is not None:
