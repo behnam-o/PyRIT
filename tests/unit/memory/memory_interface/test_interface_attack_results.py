@@ -782,6 +782,12 @@ def test_get_attack_results_by_labels_multiple(sqlite_instance: MemoryInterface)
     assert conversation_ids == {"conv_1", "conv_2"}
 
 
+def test_get_attack_results_targeted_harm_categories_deprecation_warning(sqlite_instance: MemoryInterface):
+    """Test that passing targeted_harm_categories emits a DeprecationWarning."""
+    with pytest.deprecated_call():
+        sqlite_instance.get_attack_results(targeted_harm_categories=["violence"])
+
+
 def test_get_attack_results_labels_no_matches(sqlite_instance: MemoryInterface):
     """Test filtering by labels that don't exist."""
 
