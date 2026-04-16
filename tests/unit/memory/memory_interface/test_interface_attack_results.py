@@ -5,6 +5,8 @@
 import uuid
 from typing import TYPE_CHECKING, Optional
 
+import pytest
+
 from pyrit.common.utils import to_sha256
 from pyrit.identifiers import ComponentIdentifier
 from pyrit.identifiers.atomic_attack_identifier import build_atomic_attack_identifier
