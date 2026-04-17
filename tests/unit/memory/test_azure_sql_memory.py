@@ -8,6 +8,7 @@ from datetime import timezone
 from typing import TYPE_CHECKING
 
 import pytest
+from sqlalchemy import inspect, text
 
 from pyrit.memory import AzureSQLMemory, EmbeddingDataEntry, PromptMemoryEntry
 from pyrit.models import MessagePiece
@@ -133,6 +134,28 @@ def test_default_embedding_raises(memory_interface: AzureSQLMemory):
 
     with pytest.raises(ValueError):
         memory_interface.enable_embedding()
+
+
+def test_reset_database_recreates_versioned_schema(memory_interface: AzureSQLMemory):
+    memory_interface.reset_database()
+
+    inspector = inspect(memory_interface.engine)
+    table_names = set(inspector.get_table_names())
+
+    assert {
+        "AttackResultEntries",
+        "EmbeddingData",
+        "PromptMemoryEntries",
+        "ScenarioResultEntries",
+        "ScoreEntries",
+        "SeedPromptEntries",
+        "pyrit_memory_alembic_version",
+    }.issubset(table_names)
+
+    with memory_interface.engine.connect() as connection:
+        version = connection.execute(text("SELECT version_num FROM pyrit_memory_alembic_version")).scalar_one()
+
+    assert version
 
 
 def test_query_entries(

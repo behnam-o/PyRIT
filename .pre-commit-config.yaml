@@ -25,6 +25,11 @@ repos:
         files: ^(doc/.*\.(py|ipynb|md)|doc/myst\.yml)$
         pass_filenames: false
         additional_dependencies: ['pyyaml']
+      - id: memory-migrations-check
+        name: Check Memory Migrations
+        entry: python ./build_scripts/memory_migrations.py check
+        language: system
+        pass_filenames: false
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0

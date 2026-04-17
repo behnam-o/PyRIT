@@ -26,6 +26,7 @@ from pyrit.memory.memory_models import (
     EmbeddingDataEntry,
     PromptMemoryEntry,
 )
+from pyrit.memory.migration import reset_schema
 from pyrit.models import (
     AzureBlobStorageIO,
     ConversationStats,
@@ -207,20 +208,6 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
 
             # add the encoded token
             cparams["attrs_before"] = {self.SQL_COPT_SS_ACCESS_TOKEN: packed_azure_token}
-
-    def _create_tables_if_not_exist(self) -> None:
-        """
-        Create all tables defined in the Base metadata, if they don't already exist in the database.
-
-        Raises:
-            Exception: If there's an issue creating the tables in the database.
-        """
-        try:
-            # Using the 'checkfirst=True' parameter to avoid attempting to recreate existing tables
-            Base.metadata.create_all(self.engine, checkfirst=True)
-        except Exception as e:
-            logger.exception(f"Error during table creation: {e}")
-            raise
 
     def _add_embeddings_to_memory(self, *, embedding_data: Sequence[EmbeddingDataEntry]) -> None:
         """
@@ -791,7 +778,4 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
 
     def reset_database(self) -> None:
         """Drop and recreate existing tables."""
-        # Drop all existing tables
-        Base.metadata.drop_all(self.engine)
-        # Recreate the tables
-        Base.metadata.create_all(self.engine, checkfirst=True)
+        reset_schema(engine=self.engine)

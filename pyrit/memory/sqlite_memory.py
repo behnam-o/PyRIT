@@ -28,6 +28,7 @@ from pyrit.memory.memory_models import (
     PromptMemoryEntry,
     ScenarioResultEntry,
 )
+from pyrit.memory.migration import reset_schema
 from pyrit.models import ConversationStats, DiskStorageIO, MessagePiece
 
 logger = logging.getLogger(__name__)
@@ -126,20 +127,6 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
             return engine
         except SQLAlchemyError as e:
             logger.exception(f"Error creating the engine for the database: {e}")
-            raise
-
-    def _create_tables_if_not_exist(self) -> None:
-        """
-        Create all tables defined in the Base metadata, if they don't already exist in the database.
-
-        Raises:
-            Exception: If there's an issue creating the tables in the database.
-        """
-        try:
-            # Using the 'checkfirst=True' parameter to avoid attempting to recreate existing tables
-            Base.metadata.create_all(self.engine, checkfirst=True)
-        except Exception as e:
-            logger.exception(f"Error during table creation: {e}")
             raise
 
     def get_all_embeddings(self) -> Sequence[EmbeddingDataEntry]:
@@ -441,8 +428,7 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         """
         Drop and recreates all tables in the database.
         """
-        Base.metadata.drop_all(self.engine)
-        Base.metadata.create_all(self.engine)
+        reset_schema(engine=self.engine)
 
     def dispose_engine(self) -> None:
         """

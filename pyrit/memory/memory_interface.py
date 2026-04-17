@@ -34,6 +34,7 @@ from pyrit.memory.memory_models import (
     ScoreEntry,
     SeedEntry,
 )
+from pyrit.memory.migration import run_schema_migrations
 from pyrit.models import (
     AttackResult,
     ConversationStats,
@@ -118,6 +119,19 @@ class MemoryInterface(abc.ABC):
         Sets the memory_embedding attribute to None, disabling any embedding operations.
         """
         self.memory_embedding = None
+
+    def _create_tables_if_not_exist(self) -> None:
+        """
+        Upgrade the database schema to the latest Alembic revision.
+
+        Raises:
+            Exception: If there's an issue applying schema migrations.
+        """
+        try:
+            run_schema_migrations(engine=self.engine)
+        except Exception as e:
+            logger.exception(f"Error during schema migration: {e}")
+            raise
 
     def _build_identifier_filter_conditions(
         self,
