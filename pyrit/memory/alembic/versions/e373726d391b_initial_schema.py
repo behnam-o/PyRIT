@@ -21,7 +21,14 @@ from sqlalchemy.types import TypeDecorator, Uuid
 
 
 class _CustomUUID(TypeDecorator[uuid.UUID]):
-    """Frozen copy of CustomUUID kept here so this revision stays self-contained."""
+    """
+    Frozen copy of CustomUUID kept here so this revision stays self-contained.
+
+    This class is embedded in the migration script rather than imported to ensure
+    the migration remains reproducible and independent of future changes to the
+    main CustomUUID implementation in memory_models.py. Any future modifications
+    to CustomUUID must NOT affect this frozen version.
+    """
 
     impl = CHAR
     cache_ok = True

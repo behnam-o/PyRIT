@@ -91,8 +91,9 @@ def _cmd_check() -> None:
         db_url = f"sqlite:///{tmp.name}"
 
     try:
-        command.upgrade(_make_config(db_url=db_url), "head")
-        command.check(_make_config(db_url=db_url))
+        config = _make_config(db_url=db_url)
+        command.upgrade(config, "head")
+        command.check(config)
     except Exception as e:
         _print_error(
             f"Migration check failed. Run the script in 'generate' mode to generate a new migration. Error: {e}"

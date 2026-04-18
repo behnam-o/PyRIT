@@ -1,0 +1,169 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
+import os
+import tempfile
+import uuid
+from pathlib import Path
+
+from alembic import command
+from alembic.config import Config
+from alembic.script import ScriptDirectory
+from sqlalchemy import create_engine, inspect, text
+
+from pyrit.memory.alembic.versions.e373726d391b_initial_schema import _CustomUUID
+from pyrit.memory.migration import run_schema_migrations
+
+
+def _get_alembic_head_revision(*, config: Config) -> str:
+    """Return the current Alembic head revision for the configured script location."""
+    head_revision = ScriptDirectory.from_config(config).get_current_head()
+    if head_revision is None:
+        raise RuntimeError("No Alembic head revision found for memory migrations.")
+
+    return head_revision
+
+
+def test_custom_uuid_process_bind_param_with_none():
+    """Test _CustomUUID.process_bind_param with None value."""
+    uuid_type = _CustomUUID()
+    result = uuid_type.process_bind_param(None, None)
+    assert result is None
+
+
+def test_custom_uuid_process_bind_param_with_uuid():
+    """Test _CustomUUID.process_bind_param with UUID value."""
+    uuid_type = _CustomUUID()
+    test_uuid = uuid.uuid4()
+    result = uuid_type.process_bind_param(test_uuid, None)
+    assert result == str(test_uuid)
+
+
+def test_custom_uuid_process_result_value_with_none():
+    """Test _CustomUUID.process_result_value with None value."""
+    uuid_type = _CustomUUID()
+    result = uuid_type.process_result_value(None, None)
+    assert result is None
+
+
+def test_custom_uuid_process_result_value_with_uuid():
+    """Test _CustomUUID.process_result_value with UUID value."""
+    uuid_type = _CustomUUID()
+    test_uuid = uuid.uuid4()
+    result = uuid_type.process_result_value(test_uuid, None)
+    assert result == test_uuid
+
+
+def test_custom_uuid_process_result_value_with_string():
+    """Test _CustomUUID.process_result_value with string value."""
+    uuid_type = _CustomUUID()
+    test_uuid = uuid.uuid4()
+    result = uuid_type.process_result_value(str(test_uuid), None)
+    assert result == test_uuid
+
+
+def test_custom_uuid_load_dialect_impl_sqlite():
+    """Test _CustomUUID.load_dialect_impl for SQLite dialect."""
+    from sqlalchemy.dialects import sqlite
+
+    uuid_type = _CustomUUID()
+    dialect = sqlite.dialect()
+    result = uuid_type.load_dialect_impl(dialect)
+    assert result is not None
+
+
+def test_custom_uuid_load_dialect_impl_postgresql():
+    """Test _CustomUUID.load_dialect_impl for PostgreSQL dialect."""
+    from sqlalchemy.dialects import postgresql
+
+    uuid_type = _CustomUUID()
+    dialect = postgresql.dialect()
+    result = uuid_type.load_dialect_impl(dialect)
+    assert result is not None
+
+
+def test_run_schema_migrations_applies_head_revision():
+    """Test that run_schema_migrations applies the current head revision."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        db_path = os.path.join(temp_dir, "offline-test.db")
+        engine = create_engine(f"sqlite:///{db_path}")
+        try:
+            pyrit_root = Path(__file__).resolve().parent.parent.parent.parent / "pyrit"
+            script_location = pyrit_root / "memory" / "alembic"
+            config = Config()
+            config.set_main_option("script_location", str(script_location))
+            expected_head = _get_alembic_head_revision(config=config)
+
+            run_schema_migrations(engine=engine)
+
+            with engine.connect() as connection:
+                version = connection.execute(text("SELECT version_num FROM pyrit_memory_alembic_version")).scalar_one()
+            assert version == expected_head
+        finally:
+            engine.dispose()
+
+
+def test_migration_online_mode():
+    """
+    Test that online migration configuration is valid.
+    This tests the run_migrations_online path in env.py.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        db_path = os.path.join(temp_dir, "online-test.db")
+        engine = create_engine(f"sqlite:///{db_path}")
+        try:
+            with engine.begin() as connection:
+                pyrit_root = Path(__file__).resolve().parent.parent.parent.parent / "pyrit"
+                script_location = pyrit_root / "memory" / "alembic"
+                config = Config()
+                config.set_main_option("script_location", str(script_location))
+                config.attributes["connection"] = connection
+                config.attributes["version_table"] = "pyrit_memory_alembic_version"
+                expected_head = _get_alembic_head_revision(config=config)
+
+                command.upgrade(config, "head")
+
+                version = connection.execute(text("SELECT version_num FROM pyrit_memory_alembic_version")).scalar_one()
+                assert version == expected_head
+        finally:
+            engine.dispose()
+
+
+def test_migration_script_metadata():
+    """Test that the initial migration script has correct metadata."""
+    from pyrit.memory.alembic.versions import e373726d391b_initial_schema
+
+    assert e373726d391b_initial_schema.revision == "e373726d391b"
+    assert e373726d391b_initial_schema.down_revision is None
+    assert e373726d391b_initial_schema.branch_labels is None
+    assert e373726d391b_initial_schema.depends_on is None
+
+
+def test_migration_downgrade_creates_proper_structure():
+    """
+    Test that downgrade function doesn't corrupt the database.
+    This indirectly tests the downgrade path in e373726d391b_initial_schema.py.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        db_path = os.path.join(temp_dir, "downgrade-test.db")
+        engine = create_engine(f"sqlite:///{db_path}")
+        try:
+            with engine.begin() as connection:
+                pyrit_root = Path(__file__).resolve().parent.parent.parent.parent / "pyrit"
+                script_location = pyrit_root / "memory" / "alembic"
+                config = Config()
+                config.set_main_option("script_location", str(script_location))
+                config.attributes["connection"] = connection
+                config.attributes["version_table"] = "pyrit_memory_alembic_version"
+
+                command.upgrade(config, "head")
+
+                tables_before = set(inspect(connection).get_table_names())
+                assert len(tables_before) > 0
+
+                command.downgrade(config, "base")
+
+                tables_after = set(inspect(connection).get_table_names())
+                assert "pyrit_memory_alembic_version" not in tables_after or len(tables_after) == 1
+        finally:
+            engine.dispose()

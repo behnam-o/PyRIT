@@ -18,7 +18,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
-VERSION_TABLE = "pyrit_memory_alembic_version"
+VERSION_TABLE = config.attributes.get("version_table", "pyrit_memory_alembic_version")
 
 
 def run_migrations_offline() -> None:

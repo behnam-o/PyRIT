@@ -197,6 +197,8 @@ include = ["pyrit", "pyrit.*"]
 [tool.setuptools.package-data]
 pyrit = [
     "backend/frontend/**/*",
+    "memory/alembic/**/*",
+    "memory/alembic.ini",
     "py.typed"
 ]
 

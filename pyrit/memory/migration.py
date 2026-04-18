@@ -8,7 +8,7 @@ from alembic import command
 from alembic.autogenerate.api import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
-from sqlalchemy import inspect, text
+from sqlalchemy import MetaData, Table, inspect
 from sqlalchemy.engine import Connection, Engine
 
 from pyrit.memory.memory_models import Base
@@ -26,6 +26,32 @@ _MEMORY_TABLES = {
     "ScoreEntries",
     "SeedPromptEntries",
 }
+
+
+def _include_name_for_memory_schema(
+    name: str | None,
+    type_: str,
+    parent_names: dict[str, str],
+) -> bool:
+    """
+    Restrict schema comparisons to PyRIT memory tables and their child objects.
+
+    Args:
+        name (str | None): Name of the database object being considered.
+        type_ (str): SQLAlchemy object type (e.g., "table", "column", "index").
+        parent_names (dict[str, str]): Parent-name context provided by Alembic.
+
+    Returns:
+        bool: True when the object should be included in schema comparison.
+    """
+    if type_ == "table":
+        return bool(name and name in _MEMORY_TABLES)
+
+    table_name = parent_names.get("table_name")
+    if table_name:
+        return table_name in _MEMORY_TABLES
+
+    return True
 
 
 def _make_config(*, connection: Connection) -> Config:
@@ -58,15 +84,24 @@ def _validate_and_stamp_unversioned_memory_schema(*, config: Config, connection:
     Raises:
         RuntimeError: If an unversioned memory schema does not match models.
     """
-    table_names = set(inspect(connection).get_table_names())
+    # Perform all inspection in one atomic call to avoid race conditions
+    inspector = inspect(connection)
+    table_names = set(inspector.get_table_names())
+
+    # If version table already exists, migration has been stamped
     if _MEMORY_ALEMBIC_VERSION_TABLE in table_names:
         return
 
+    # If no memory tables exist, this is a fresh database
     if not _MEMORY_TABLES.intersection(table_names):
         return
 
+    # Unversioned memory schema detected; validate it matches current models
     try:
-        migration_context = MigrationContext.configure(connection=connection, opts={"compare_type": True})
+        migration_context = MigrationContext.configure(
+            connection=connection,
+            opts={"compare_type": True, "include_name": _include_name_for_memory_schema},
+        )
         diffs = compare_metadata(migration_context, Base.metadata)
     except Exception as e:
         raise RuntimeError(
@@ -96,8 +131,6 @@ def run_schema_migrations(*, engine: Engine) -> None:
     Raises:
         Exception: If Alembic fails to apply migrations.
     """
-    script_location = Path(__file__).with_name("alembic")
-    logger.debug("Applying Alembic migrations from %s", script_location)
     with engine.begin() as connection:
         config = _make_config(connection=connection)
         _validate_and_stamp_unversioned_memory_schema(config=config, connection=connection)
@@ -113,10 +146,14 @@ def reset_schema(*, engine: Engine) -> None:
     """
     logger.debug("Resetting memory schema using Alembic migrations")
     with engine.begin() as connection:
-        Base.metadata.drop_all(connection)
-
+        # Drop version table first (not part of Base.metadata)
         inspector = inspect(connection)
         if _MEMORY_ALEMBIC_VERSION_TABLE in inspector.get_table_names():
-            connection.execute(text(f'DROP TABLE "{_MEMORY_ALEMBIC_VERSION_TABLE}"'))
+            version_table = Table(_MEMORY_ALEMBIC_VERSION_TABLE, MetaData(), autoload_with=connection)
+            version_table.drop(connection)
 
+        # Drop all application tables defined in models
+        Base.metadata.drop_all(connection)
+
+        # Rebuild schema from migrations
         command.upgrade(_make_config(connection=connection), _HEAD_REVISION)
