@@ -465,20 +465,24 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         for i, (key, value) in enumerate(labels.items()):
             path_param = f"ar_label_path_{i}"
             value_param = f"ar_label_val_{i}"
-            ar_label_conditions.append(f'JSON_VALUE("AttackResultEntries".labels, :{path_param}) = :{value_param}')
+            ar_label_conditions.append(
+                f'JSON_VALUE("AttackResultEntries".labels, :{path_param}) = :{value_param}'
+            )
             ar_bindparams[path_param] = f"$.{key}"
             ar_bindparams[value_param] = str(value)
 
         ar_combined = " AND ".join(ar_label_conditions)
         direct_condition = and_(
             AttackResultEntry.labels.isnot(None),
-            text(f'ISJSON("AttackResultEntries".labels) = 1 AND {ar_combined}').bindparams(**ar_bindparams),
+            text(
+                f'ISJSON("AttackResultEntries".labels) = 1 AND {ar_combined}'
+            ).bindparams(**ar_bindparams),
         )
 
         # --- Conversation-level match on PromptMemoryEntry.labels ---
         pme_label_conditions = []
         pme_bindparams: dict[str, str] = {}
-        for key, value in labels.items():
+        for i, (key, value) in enumerate(labels.items()):
             param_name = f"pme_label_{key}"
             pme_label_conditions.append(f"JSON_VALUE(labels, '$.{key}') = :{param_name}")
             pme_bindparams[param_name] = str(value)
@@ -488,7 +492,9 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
             and_(
                 PromptMemoryEntry.conversation_id == AttackResultEntry.conversation_id,
                 PromptMemoryEntry.labels.isnot(None),
-                text(f"ISJSON(labels) = 1 AND {pme_combined}").bindparams(**pme_bindparams),
+                text(
+                    f"ISJSON(labels) = 1 AND {pme_combined}"
+                ).bindparams(**pme_bindparams),
             )
         )
 
