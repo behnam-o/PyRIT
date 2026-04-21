@@ -238,7 +238,6 @@ class PromptSendingAttack(SingleTurnAttackStrategy):
             outcome=outcome,
             outcome_reason=outcome_reason,
             executed_turns=1,
-            labels=context.memory_labels,
         )
 
     def _determine_attack_outcome(
