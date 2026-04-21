@@ -95,7 +95,9 @@ def make_attack_result(
             "created_at": created.isoformat(),
             "updated_at": updated.isoformat(),
         },
-        labels={"test_ar_label": "test_ar_value"},
+        labels={
+            "test_ar_label": "test_ar_value"
+        },
     )
 
 

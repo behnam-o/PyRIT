@@ -81,7 +81,9 @@ def _make_attack_result(
             "created_at": now.isoformat(),
             "updated_at": now.isoformat(),
         },
-        labels={"test_ar_label": "test_ar_value"},
+        labels={
+            "test_ar_label": "test_ar_value"
+        },
     )
 
 
@@ -189,10 +191,7 @@ class TestAttackResultToSummary:
         summary = attack_result_to_summary(ar, stats=stats)
 
         assert summary.labels == {
-            "operator": "alice",
-            "operation": "op_red",
-            "env": "prod",
-            "test_ar_label": "test_ar_value",
+            "operator": "alice", "operation": "op_red", "env": "prod", "test_ar_label": "test_ar_value"
         }
 
     def test_conversation_labels_take_precedence_on_collision(self) -> None:
