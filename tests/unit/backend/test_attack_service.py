@@ -95,9 +95,6 @@ def make_attack_result(
             "created_at": created.isoformat(),
             "updated_at": updated.isoformat(),
         },
-        labels={
-            "test_ar_label": "test_ar_value"
-        },
     )
 
 
@@ -324,7 +321,7 @@ class TestListAttacks:
         result = await attack_service.list_attacks_async()
 
         assert len(result.items) == 1
-        assert result.items[0].labels == {"env": "prod", "team": "red", "test_ar_label": "test_ar_value"}
+        assert result.items[0].labels == {"env": "prod", "team": "red"}
 
     @pytest.mark.asyncio
     async def test_list_attacks_filters_by_labels_directly(self, attack_service, mock_memory) -> None:

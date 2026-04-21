@@ -613,17 +613,26 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
 
     def _get_attack_result_label_condition(self, *, labels: dict[str, str]) -> Any:
         """
-        SQLite implementation for filtering AttackResults by labels
-        stored directly on the AttackResultEntry.
+        SQLite implementation for filtering AttackResults by labels.
         Uses json_extract() function specific to SQLite.
 
         Returns:
-            Any: A SQLAlchemy condition for filtering by labels.
+            Any: A SQLAlchemy subquery for filtering by labels.
         """
-        return and_(
-            AttackResultEntry.labels.isnot(None),
-            *[func.json_extract(AttackResultEntry.labels, f"$.{key}") == value for key, value in labels.items()],
+        from sqlalchemy import and_, exists, func
+
+        from pyrit.memory.memory_models import AttackResultEntry, PromptMemoryEntry
+
+        labels_subquery = exists().where(
+            and_(
+                PromptMemoryEntry.conversation_id == AttackResultEntry.conversation_id,
+                PromptMemoryEntry.labels.isnot(None),
+                and_(
+                    *[func.json_extract(PromptMemoryEntry.labels, f"$.{key}") == value for key, value in labels.items()]
+                ),
+            )
         )
+        return labels_subquery  # noqa: RET504
 
     def get_unique_attack_class_names(self) -> list[str]:
         """

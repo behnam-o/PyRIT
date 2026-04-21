@@ -181,5 +181,4 @@ class SkeletonKeyAttack(PromptSendingAttack):
             outcome=AttackOutcome.FAILURE,
             outcome_reason="Skeleton key prompt was filtered or failed",
             executed_turns=1,
-            labels=context.memory_labels,
         )
