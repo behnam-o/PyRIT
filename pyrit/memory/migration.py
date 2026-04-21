@@ -137,14 +137,16 @@ def run_schema_migrations(*, engine: Engine) -> None:
         command.upgrade(config, _HEAD_REVISION)
 
 
-def reset_schema(*, engine: Engine) -> None:
+def reset_database(*, engine: Engine) -> None:
     """
-    Recreate the database schema at the latest Alembic revision.
+    Drop all tables and recreate the database schema at the latest Alembic revision.
+
+    This destroys all existing data.
 
     Args:
         engine (Engine): SQLAlchemy engine bound to the target database.
     """
-    logger.debug("Resetting memory schema using Alembic migrations")
+    logger.debug("Resetting database using Alembic migrations")
     with engine.begin() as connection:
         # Drop version table first (not part of Base.metadata)
         inspector = inspect(connection)

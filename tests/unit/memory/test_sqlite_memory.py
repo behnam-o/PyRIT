@@ -937,9 +937,9 @@ def test_run_schema_migrations_no_memory_tables():
             engine.dispose()
 
 
-def test_create_tables_if_not_exist_with_schema_migration_exception():
+def test_ensure_schema_is_current_with_schema_migration_exception():
     """
-    Test that _create_tables_if_not_exist properly handles and re-raises exceptions.
+    Test that _ensure_schema_is_current properly handles and re-raises exceptions.
     This tests lines 132-134 in memory_interface.py.
     """
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -952,6 +952,6 @@ def test_create_tables_if_not_exist_with_schema_migration_exception():
                 mock_migrate.side_effect = RuntimeError("Mock migration error")
 
                 with pytest.raises(RuntimeError, match="Mock migration error"):
-                    memory._create_tables_if_not_exist()
+                    memory._ensure_schema_is_current()
         finally:
             memory.dispose_engine()

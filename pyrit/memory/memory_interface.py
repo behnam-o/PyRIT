@@ -120,7 +120,7 @@ class MemoryInterface(abc.ABC):
         """
         self.memory_embedding = None
 
-    def _create_tables_if_not_exist(self) -> None:
+    def _ensure_schema_is_current(self) -> None:
         """
         Upgrade the database schema to the latest Alembic revision.
 

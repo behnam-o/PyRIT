@@ -26,7 +26,7 @@ from pyrit.memory.memory_models import (
     EmbeddingDataEntry,
     PromptMemoryEntry,
 )
-from pyrit.memory.migration import reset_schema
+from pyrit.memory.migration import reset_database
 from pyrit.models import (
     AzureBlobStorageIO,
     ConversationStats,
@@ -104,7 +104,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         self._enable_azure_authorization()
 
         self.SessionFactory = sessionmaker(bind=self.engine)
-        self._create_tables_if_not_exist()
+        self._ensure_schema_is_current()
 
         super().__init__()
 
@@ -778,4 +778,4 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
 
     def reset_database(self) -> None:
         """Drop and recreate existing tables."""
-        reset_schema(engine=self.engine)
+        reset_database(engine=self.engine)
