@@ -99,7 +99,7 @@ export function UserAccountButton() {
   const config = useAuthConfig()
 
   // Auth disabled — no MsalProvider in tree
-  if (!config.clientId) {
+  if (!config.clientId || !config.tenantId) {
     return null
   }
 
