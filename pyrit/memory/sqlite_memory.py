@@ -28,7 +28,6 @@ from pyrit.memory.memory_models import (
     PromptMemoryEntry,
     ScenarioResultEntry,
 )
-from pyrit.memory.migration import reset_database
 from pyrit.models import ConversationStats, DiskStorageIO, MessagePiece
 
 logger = logging.getLogger(__name__)
@@ -423,12 +422,6 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
             Session: A SQLAlchemy session bound to the engine.
         """
         return self.SessionFactory()
-
-    def reset_database(self) -> None:
-        """
-        Drop and recreates all tables in the database.
-        """
-        reset_database(engine=self.engine)
 
     def dispose_engine(self) -> None:
         """

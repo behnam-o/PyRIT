@@ -34,7 +34,7 @@ from pyrit.memory.memory_models import (
     ScoreEntry,
     SeedEntry,
 )
-from pyrit.memory.migration import run_schema_migrations
+from pyrit.memory.migration import reset_database, run_schema_migrations
 from pyrit.models import (
     AttackResult,
     ConversationStats,
@@ -964,6 +964,12 @@ class MemoryInterface(abc.ABC):
         return self.update_prompt_entries_by_conversation_id(
             conversation_id=conversation_id, update_fields={"prompt_metadata": prompt_metadata}
         )
+
+    def reset_database(self) -> None:
+        """
+        Drop and recreate all tables in the database.
+        """
+        reset_database(engine=self.engine)
 
     @abc.abstractmethod
     def dispose_engine(self) -> None:
