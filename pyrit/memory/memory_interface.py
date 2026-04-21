@@ -420,7 +420,7 @@ class MemoryInterface(abc.ABC):
     def _get_attack_result_label_condition(self, *, labels: dict[str, str]) -> Any:
         """
         Return a database-specific condition for filtering AttackResults by labels
-        stored directly on the AttackResultEntry OR on an associated PromptMemoryEntry (via conversation_id).
+        stored directly on the AttackResultEntry.
 
         Args:
             labels: Dictionary of labels that must ALL be present.

@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional, TypeVar, Union, cast
 
-from sqlalchemy import and_, create_engine, exists, func, or_, text
+from sqlalchemy import and_, create_engine, func, or_, text
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import InstrumentedAttribute, joinedload, sessionmaker
@@ -613,28 +613,17 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
 
     def _get_attack_result_label_condition(self, *, labels: dict[str, str]) -> Any:
         """
-        SQLite implementation for filtering AttackResults by labels.
-
-        Matches if the labels are found on the AttackResultEntry directly
-        OR on an associated PromptMemoryEntry (via conversation_id).
+        SQLite implementation for filtering AttackResults by labels
+        stored directly on the AttackResultEntry.
+        Uses json_extract() function specific to SQLite.
 
         Returns:
             Any: A SQLAlchemy condition for filtering by labels.
         """
-        direct_condition = and_(
+        return and_(
             AttackResultEntry.labels.isnot(None),
             *[func.json_extract(AttackResultEntry.labels, f"$.{key}") == value for key, value in labels.items()],
         )
-
-        conversation_condition = exists().where(
-            and_(
-                PromptMemoryEntry.conversation_id == AttackResultEntry.conversation_id,
-                PromptMemoryEntry.labels.isnot(None),
-                *[func.json_extract(PromptMemoryEntry.labels, f"$.{key}") == value for key, value in labels.items()],
-            )
-        )
-
-        return or_(direct_condition, conversation_condition)
 
     def get_unique_attack_class_names(self) -> list[str]:
         """
