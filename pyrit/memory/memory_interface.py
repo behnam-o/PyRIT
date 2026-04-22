@@ -126,7 +126,10 @@ class MemoryInterface(abc.ABC):
 
         Raises:
             Exception: If there's an issue applying schema migrations.
+            RuntimeError: If the engine is not initialized.
         """
+        if self.engine is None:
+            raise RuntimeError("Engine is not initialized")
         try:
             run_schema_migrations(engine=self.engine)
         except Exception as e:
@@ -968,7 +971,12 @@ class MemoryInterface(abc.ABC):
     def reset_database(self) -> None:
         """
         Drop and recreate all tables in the database.
+
+        Raises:
+            RuntimeError: If the engine is not initialized.
         """
+        if self.engine is None:
+            raise RuntimeError("Engine is not initialized")
         reset_database(engine=self.engine)
 
     @abc.abstractmethod

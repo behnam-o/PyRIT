@@ -462,11 +462,11 @@ def test_provide_token_raises_when_auth_token_none():
         captured_fn(None, None, ["some_connection_string"], {})
 
 
-def test_create_tables_if_not_exist_raises_when_engine_none():
+def test_ensure_schema_is_current_raises_when_engine_none():
     obj = AzureSQLMemory.__new__(AzureSQLMemory)
     obj.engine = None
     with pytest.raises(RuntimeError, match="Engine is not initialized"):
-        obj._create_tables_if_not_exist()
+        obj._ensure_schema_is_current()
 
 
 def test_reset_database_raises_when_engine_none():
