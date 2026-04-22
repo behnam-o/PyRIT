@@ -79,6 +79,4 @@ describe('ErrorBoundary', () => {
       expect.any(String)
     )
   })
-
-
 })
