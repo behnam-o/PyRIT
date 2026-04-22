@@ -6,6 +6,7 @@ import { UserAccountButton } from './UserAccountButton'
 const mockLoginRedirect = jest.fn()
 const mockLogoutRedirect = jest.fn()
 const mockGetActiveAccount = jest.fn()
+let mockAccounts: { name?: string; username?: string }[] = []
 
 jest.mock('@azure/msal-react', () => ({
   useMsal: () => ({
@@ -14,7 +15,7 @@ jest.mock('@azure/msal-react', () => ({
       loginRedirect: mockLoginRedirect,
       logoutRedirect: mockLogoutRedirect,
     },
-    accounts: [],
+    accounts: mockAccounts,
   }),
 }))
 
@@ -36,7 +37,10 @@ describe('UserAccountButton', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockGetActiveAccount.mockReturnValue(null)
+    mockLoginRedirect.mockResolvedValue(undefined)
+    mockLogoutRedirect.mockResolvedValue(undefined)
     mockAuthConfig = { clientId: '', tenantId: '', allowedGroupIds: '' }
+    mockAccounts = []
   })
 
   it('returns null when auth is disabled (no clientId)', () => {
@@ -91,6 +95,19 @@ describe('UserAccountButton', () => {
     )
 
     expect(screen.getByText('Alice Smith')).toBeInTheDocument()
+  })
+
+  it('renders user display name when account comes from accounts[0] (no active account)', () => {
+    mockAuthConfig = { clientId: 'test-client-id', tenantId: 'test-tenant', allowedGroupIds: '' }
+    mockAccounts = [{ name: 'Bob Jones', username: 'bob@example.com' }]
+
+    render(
+      <TestWrapper>
+        <UserAccountButton />
+      </TestWrapper>
+    )
+
+    expect(screen.getByText('Bob Jones')).toBeInTheDocument()
   })
 
   it('calls logoutRedirect when Sign Out is clicked', async () => {
