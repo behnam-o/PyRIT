@@ -38,7 +38,7 @@ function MsalAccountButton() {
     )
   }
 
-  const displayName = account.name ?? account.username ?? 'User'
+  const displayName = account.name || account.username || 'User'
   const initials = displayName
     .split(' ')
     .map((part) => part[0])
