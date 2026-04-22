@@ -141,10 +141,15 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
     def _refresh_token_if_needed(self) -> None:
         """
         Refresh the access token if it is close to expiry (within 5 minutes).
+
+        Raises:
+            RuntimeError: If auth token expiry was not initialized.
         """
-        if datetime.now(timezone.utc) >= datetime.fromtimestamp(self._auth_token_expiry, tz=timezone.utc) - timedelta(
-            minutes=5
-        ):
+        if self._auth_token_expiry is None:
+            raise RuntimeError("Auth token expiry not initialized; call _create_auth_token() first")
+        if datetime.now(timezone.utc) >= datetime.fromtimestamp(
+            float(self._auth_token_expiry), tz=timezone.utc
+        ) - timedelta(minutes=5):
             logger.info("Refreshing Microsoft Entra ID access token...")
             self._create_auth_token()
 
@@ -200,6 +205,8 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
             cargs[0] = cargs[0].replace(";Trusted_Connection=Yes", "")
 
             # encode the token
+            if self._auth_token is None:
+                raise RuntimeError("Azure auth token is not initialized")
             azure_token = self._auth_token.token
             azure_token_bytes = azure_token.encode("utf-16-le")
             packed_azure_token = struct.pack(f"<I{len(azure_token_bytes)}s", len(azure_token_bytes), azure_token_bytes)

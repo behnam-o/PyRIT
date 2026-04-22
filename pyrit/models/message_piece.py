@@ -13,6 +13,7 @@ from pyrit.identifiers.component_identifier import ComponentIdentifier
 from pyrit.models.literals import ChatMessageRole, PromptDataType, PromptResponseError
 
 if TYPE_CHECKING:
+    from pyrit.models.message import Message
     from pyrit.models.score import Score
 
 Originator = Literal["attack", "converter", "undefined", "scorer"]
@@ -198,6 +199,24 @@ class MessagePiece:
             )
         self.targeted_harm_categories = targeted_harm_categories if targeted_harm_categories else []
 
+    def copy_lineage_from(self, source: MessagePiece) -> None:
+        """
+        Copy lineage metadata from ``source`` onto this piece.
+
+        Lineage fields are the metadata that tie a piece back to its originating
+        conversation, attack, and target. Mutable containers (``labels``,
+        ``prompt_metadata``) are shallow-copied so that mutations on one piece
+        do not affect others.
+
+        Args:
+            source: The piece whose lineage metadata is authoritative.
+        """
+        self.conversation_id = source.conversation_id
+        self.labels = dict(source.labels)
+        self.attack_identifier = source.attack_identifier
+        self.prompt_target_identifier = source.prompt_target_identifier
+        self.prompt_metadata = dict(source.prompt_metadata)
+
     async def set_sha256_values_async(self) -> None:
         """
         Compute SHA256 hash values for original and converted payloads.
@@ -255,7 +274,7 @@ class MessagePiece:
         """
         return self._role
 
-    def to_message(self) -> Message:  # type: ignore[name-defined] # noqa: F821
+    def to_message(self) -> Message:
         """
         Convert this message piece into a Message.
 
@@ -264,7 +283,7 @@ class MessagePiece:
         """
         from pyrit.models.message import Message
 
-        return Message([self])  # noqa: F821
+        return Message([self])
 
     def has_error(self) -> bool:
         """
@@ -292,7 +311,7 @@ class MessagePiece:
 
         This is needed when we're scoring prompts or other things that have not been sent by PyRIT
         """
-        self.id = None
+        self.id = None  # type: ignore[assignment]
 
     def to_dict(self) -> dict[str, object]:
         """
