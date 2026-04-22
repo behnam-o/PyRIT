@@ -4,41 +4,20 @@
 import {
   Avatar,
   Button,
-  makeStyles,
   Popover,
   PopoverSurface,
   PopoverTrigger,
   Text,
-  tokens,
 } from '@fluentui/react-components'
 import { PersonRegular } from '@fluentui/react-icons'
 import { useMsal } from '@azure/msal-react'
 import { useAuthConfig } from '../auth/AuthConfigContext'
 import { buildLoginRequest } from '../auth/msalConfig'
-
-const useStyles = makeStyles({
-  wrapper: {
-    marginLeft: 'auto',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  popoverContent: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalS,
-  },
-  accountName: {
-    fontWeight: tokens.fontWeightSemibold,
-  },
-  accountEmail: {
-    fontSize: tokens.fontSizeBase200,
-    color: tokens.colorNeutralForeground3,
-  },
-})
+import { useUserAccountButtonStyles } from './UserAccountButton.styles'
 
 /** Renders account info when inside MsalProvider (auth enabled). */
 function MsalAccountButton() {
-  const styles = useStyles()
+  const styles = useUserAccountButtonStyles()
   const { instance, accounts } = useMsal()
   const config = useAuthConfig()
   const account = instance.getActiveAccount() ?? accounts[0]
@@ -49,7 +28,9 @@ function MsalAccountButton() {
         <Button
           appearance="subtle"
           icon={<PersonRegular />}
-          onClick={() => instance.loginRedirect(buildLoginRequest(config.clientId))}
+          onClick={() => instance.loginRedirect(buildLoginRequest(config.clientId)).catch((error) => {
+            console.error('Login redirect failed:', error)
+          })}
         >
           Log In
         </Button>
@@ -80,7 +61,9 @@ function MsalAccountButton() {
             )}
             <Button
               appearance="secondary"
-              onClick={() => instance.logoutRedirect()}
+              onClick={() => instance.logoutRedirect().catch((error) => {
+                console.error('Logout redirect failed:', error)
+              })}
             >
               Sign Out
             </Button>

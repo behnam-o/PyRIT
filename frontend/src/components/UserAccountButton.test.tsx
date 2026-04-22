@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { FluentProvider, webLightTheme } from '@fluentui/react-components'
 import { UserAccountButton } from './UserAccountButton'
 
@@ -61,8 +62,9 @@ describe('UserAccountButton', () => {
     expect(screen.getByRole('button', { name: /log in/i })).toBeInTheDocument()
   })
 
-  it('calls loginRedirect when Log In is clicked', () => {
+  it('calls loginRedirect when Log In is clicked', async () => {
     mockAuthConfig = { clientId: 'test-client-id', tenantId: 'test-tenant', allowedGroupIds: '' }
+    const user = userEvent.setup()
 
     render(
       <TestWrapper>
@@ -70,7 +72,7 @@ describe('UserAccountButton', () => {
       </TestWrapper>
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /log in/i }))
+    await user.click(screen.getByRole('button', { name: /log in/i }))
 
     expect(mockLoginRedirect).toHaveBeenCalledWith({ scopes: ['test-client-id/.default'] })
   })
@@ -91,12 +93,13 @@ describe('UserAccountButton', () => {
     expect(screen.getByText('Alice Smith')).toBeInTheDocument()
   })
 
-  it('calls logoutRedirect when Sign Out is clicked', () => {
+  it('calls logoutRedirect when Sign Out is clicked', async () => {
     mockAuthConfig = { clientId: 'test-client-id', tenantId: 'test-tenant', allowedGroupIds: '' }
     mockGetActiveAccount.mockReturnValue({
       name: 'Alice Smith',
       username: 'alice@example.com',
     })
+    const user = userEvent.setup()
 
     render(
       <TestWrapper>
@@ -105,9 +108,9 @@ describe('UserAccountButton', () => {
     )
 
     // Open the popover by clicking the user button
-    fireEvent.click(screen.getByRole('button', { name: /alice smith/i }))
+    await user.click(screen.getByRole('button', { name: /alice smith/i }))
 
-    fireEvent.click(screen.getByRole('button', { name: /sign out/i }))
+    await user.click(screen.getByRole('button', { name: /sign out/i }))
 
     expect(mockLogoutRedirect).toHaveBeenCalled()
   })
