@@ -1,76 +1,24 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-from logging.config import fileConfig
-from typing import TYPE_CHECKING
-
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import Connection
 
 from pyrit.memory.memory_models import Base
-
-if TYPE_CHECKING:
-    from sqlalchemy.engine import Connection
+from pyrit.memory.migration import PYRIT_MEMORY_ALEMBIC_VERSION_TABLE
 
 config = context.config
-
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
-
+connection: Connection | None = config.attributes.get("connection")
 target_metadata = Base.metadata
-VERSION_TABLE = config.attributes.get("version_table", "pyrit_memory_alembic_version")
 
+if connection is None:
+    raise RuntimeError("No connection found for Alembic migration")
 
-def run_migrations_offline() -> None:
-    """Run migrations in offline mode."""
-    url = config.get_main_option("sqlalchemy.url")
-    context.configure(
-        url=url,
-        target_metadata=target_metadata,
-        literal_binds=True,
-        compare_type=True,
-        version_table=VERSION_TABLE,
-        dialect_opts={"paramstyle": "named"},
-    )
-
-    with context.begin_transaction():
-        context.run_migrations()
-
-
-def run_migrations_online() -> None:
-    """Run migrations in online mode."""
-    connection: Connection | None = config.attributes.get("connection")
-
-    if connection is not None:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            compare_type=True,
-            version_table=VERSION_TABLE,
-        )
-        with context.begin_transaction():
-            context.run_migrations()
-        return
-
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-
-    with connectable.connect() as created_connection:
-        context.configure(
-            connection=created_connection,
-            target_metadata=target_metadata,
-            compare_type=True,
-            version_table=VERSION_TABLE,
-        )
-
-        with context.begin_transaction():
-            context.run_migrations()
-
-
-if context.is_offline_mode():
-    run_migrations_offline()
-else:
-    run_migrations_online()
+context.configure(
+    connection=connection,
+    target_metadata=target_metadata,
+    compare_type=True,
+    version_table=PYRIT_MEMORY_ALEMBIC_VERSION_TABLE,
+)
+with context.begin_transaction():
+    context.run_migrations()

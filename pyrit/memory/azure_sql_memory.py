@@ -103,7 +103,6 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         self._enable_azure_authorization()
 
         self.SessionFactory = sessionmaker(bind=self.engine)
-        self._ensure_schema_is_current()
 
         super().__init__()
 

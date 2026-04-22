@@ -80,7 +80,6 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
 
         self.engine = self._create_engine(has_echo=verbose)
         self.SessionFactory = sessionmaker(bind=self.engine)
-        self._ensure_schema_is_current()
 
     def _init_storage_io(self) -> None:
         # Handles disk-based storage for SQLite local memory.

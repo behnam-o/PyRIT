@@ -240,6 +240,7 @@ async def initialize_pyrit_async(
     initializers: Optional[Sequence["PyRITInitializer"]] = None,
     env_files: Optional[Sequence[pathlib.Path]] = None,
     silent: bool = False,
+    check_schema: bool = True,
     **memory_instance_kwargs: Any,
 ) -> None:
     """
@@ -258,6 +259,9 @@ async def initialize_pyrit_async(
             All paths must be valid pathlib.Path objects.
         silent (bool): If True, suppresses print statements about environment file loading.
             Defaults to False.
+        check_schema (bool): If True, runs schema migration to ensure the database is up to date.
+            Set to False to bypass the migration check (e.g., for testing or read-only access).
+            Defaults to True.
         **memory_instance_kwargs (Optional[Any]): Additional keyword arguments to pass to the memory instance.
 
     Raises:
@@ -287,6 +291,9 @@ async def initialize_pyrit_async(
         raise ValueError(
             f"Memory database type '{memory_db_type}' is not a supported type {get_args(MemoryDatabaseType)}"
         )
+    if check_schema:
+        memory._ensure_schema_is_current()
+
     CentralMemory.set_memory_instance(memory)
 
     # Combine directly provided initializers with those loaded from scripts
