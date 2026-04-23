@@ -6,7 +6,7 @@ initial schema.
 
 Revision ID: e373726d391b
 Revises:
-Create Date: 2026-04-17 10:03:04.066932
+Create Date: 2026-04-23 11:32:09.031850
 """
 
 import uuid
@@ -95,6 +95,7 @@ def upgrade() -> None:
         sa.Column("objective_scorer_identifier", sa.JSON(), nullable=True),
         sa.Column("scenario_run_state", sa.String(), nullable=False),
         sa.Column("attack_results_json", sa.Unicode(), nullable=False),
+        sa.Column("display_group_map_json", sa.Unicode(), nullable=True),
         sa.Column("labels", sa.JSON(), nullable=True),
         sa.Column("number_tries", sa.INTEGER(), nullable=False),
         sa.Column("completion_time", sa.DateTime(), nullable=False),
