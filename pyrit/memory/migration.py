@@ -114,9 +114,13 @@ def _validate_and_stamp_unversioned_memory_schema(*, config: Config, connection:
         raise RuntimeError(_ERROR_UNVERSIONED_SCHEMA_COMPARISON_FAILED) from e
 
     if diffs:
+        logger.warning(f"Detected {len(diffs)} schema diff(s) in unversioned legacy memory schema. "
+                        "Here is a list of the required corrections:")
+        for index, diff in enumerate(diffs, start=1):
+            logger.warning(f"Required correction {index}: {diff}")
         raise RuntimeError(_ERROR_UNVERSIONED_SCHEMA_MISMATCH)
 
-    logger.warn("Detected matching unversioned memory schema; stamping revision %s", _HEAD_REVISION)
+    logger.warning(f"Detected matching unversioned memory schema; stamping revision {_HEAD_REVISION}")
     command.stamp(config, _HEAD_REVISION)
 
 
