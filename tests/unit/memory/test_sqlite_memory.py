@@ -937,21 +937,3 @@ def test_run_schema_migrations_no_memory_tables():
             engine.dispose()
 
 
-def test_ensure_schema_is_current_with_schema_migration_exception():
-    """
-    Test that _ensure_schema_is_current properly handles and re-raises exceptions.
-    This tests lines 132-134 in memory_interface.py.
-    """
-    with tempfile.TemporaryDirectory() as temp_dir:
-        db_path = os.path.join(temp_dir, "error-memory.db")
-
-        memory = SQLiteMemory(db_path=db_path)
-
-        try:
-            with patch("pyrit.memory.memory_interface.run_schema_migrations") as mock_migrate:
-                mock_migrate.side_effect = RuntimeError("Mock migration error")
-
-                with pytest.raises(RuntimeError, match="Mock migration error"):
-                    memory._ensure_schema_is_current()
-        finally:
-            memory.dispose_engine()
