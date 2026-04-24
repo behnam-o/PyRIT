@@ -60,6 +60,7 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         *,
         db_path: Optional[Union[Path, str]] = None,
         verbose: bool = False,
+        skip_schema_migration: bool = False,
     ):
         """
         Initialize the SQLiteMemory instance.
@@ -68,6 +69,8 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
             db_path (Optional[Union[Path, str]]): Path to the SQLite database file.
                 Defaults to "pyrit.db".
             verbose (bool): Whether to enable verbose logging.
+                Defaults to False.
+            skip_schema_migration (bool): Whether to skip schema migration.
                 Defaults to False.
         """
         super().__init__()
@@ -80,6 +83,8 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
 
         self.engine = self._create_engine(has_echo=verbose)
         self.SessionFactory = sessionmaker(bind=self.engine)
+        if not skip_schema_migration:
+            self._run_schema_migration()
 
     def _init_storage_io(self) -> None:
         # Handles disk-based storage for SQLite local memory.

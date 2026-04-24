@@ -65,6 +65,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         results_container_url: Optional[str] = None,
         results_sas_token: Optional[str] = None,
         verbose: bool = False,
+        skip_schema_migration: bool = False,
     ):
         """
         Initialize an Azure SQL Memory backend.
@@ -77,6 +78,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
             results_sas_token (Optional[str]): The Shared Access Signature (SAS) token for the storage container.
                 If not provided, falls back to the 'AZURE_STORAGE_ACCOUNT_DB_DATA_SAS_TOKEN' environment variable.
             verbose (bool): Whether to enable verbose logging for the database engine. Defaults to False.
+            skip_schema_migration (bool): Whether to skip schema migration. Defaults to False.
         """
         self._connection_string = default_values.get_required_value(
             env_var_name=self.AZURE_SQL_DB_CONNECTION_STRING, passed_value=connection_string
@@ -103,6 +105,8 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         self._enable_azure_authorization()
 
         self.SessionFactory = sessionmaker(bind=self.engine)
+        if not skip_schema_migration:
+            self._run_schema_migration()
 
         super().__init__()
 

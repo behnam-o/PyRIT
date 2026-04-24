@@ -60,16 +60,18 @@ If you changed the schema in a meaningful way (added a table, added a foreign ke
 
 ## How Migrations Run at Startup
 
-When `initialize_pyrit_async()` is called with `check_schema=True` (the default), migrations run automatically:
+Schema migrations are triggered inside each memory class constructor (`SQLiteMemory.__init__` and `AzureSQLMemory.__init__`). When `skip_schema_migration=False` (the default), the inherited `_run_schema_migration()` method on `MemoryInterface` runs:
 
 ```
-initialize_pyrit_async()
-  → memory._ensure_schema_is_current()          # pyrit/memory/memory_interface.py
-    → run_schema_migrations(engine=...)          # pyrit/memory/migration.py
-      → alembic upgrade head
+SQLiteMemory.__init__() / AzureSQLMemory.__init__()
+  → _run_schema_migration()                      # pyrit/memory/memory_interface.py
+      → run_schema_migrations(engine=...)         # pyrit/memory/migration.py
+          → alembic upgrade head
+      → check_schema_migrations(engine=...)       # pyrit/memory/migration.py
+          → alembic check
 ```
 
-This means any new migration you add will be applied automatically the next time a user initializes PyRIT. The behavior depends on the database state:
+Both SQLite and AzureSQL follow the same migration path: first `run_schema_migrations` applies any pending Alembic revisions (`alembic upgrade head`), then `check_schema_migrations` verifies the resulting schema matches the current models (`alembic check`). The behavior depends on database state:
 
 | Database state | What happens |
 |---|---|
@@ -79,7 +81,11 @@ This means any new migration you add will be applied automatically the next time
 
 Migrations run inside a transaction (`engine.begin()`), so a failed migration rolls back cleanly. The version tracking table is `pyrit_memory_alembic_version`.
 
-Users can skip this check by passing `check_schema=False` to `initialize_pyrit_async()`.
+Users can skip migrations by passing `skip_schema_migration=True` to the memory class constructor. When using `initialize_pyrit_async()`, this can be forwarded via `**memory_instance_kwargs`:
+
+```python
+await initialize_pyrit_async("SQLite", skip_schema_migration=True)
+```
 
 ## Important Rules
 

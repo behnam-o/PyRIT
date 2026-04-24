@@ -10,6 +10,7 @@ import weakref
 from collections.abc import MutableSequence, Sequence
 from contextlib import closing
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
 
@@ -34,7 +35,7 @@ from pyrit.memory.memory_models import (
     ScoreEntry,
     SeedEntry,
 )
-from pyrit.memory.migration import reset_database
+from pyrit.memory.migration import check_schema_migrations, reset_database, run_schema_migrations
 from pyrit.models import (
     AttackResult,
     ConversationStats,
@@ -951,6 +952,21 @@ class MemoryInterface(abc.ABC):
         return self.update_prompt_entries_by_conversation_id(
             conversation_id=conversation_id, update_fields={"prompt_metadata": prompt_metadata}
         )
+
+    def _run_schema_migration(self) -> None:
+        """
+        Run schema migrations to ensure the database schema is up to date.
+
+        Raises:
+            ValueError: If an invalid schema handling option is provided.
+            RuntimeError: If the engine is not initialized when required.
+            Exception: If there is an error during schema validation or migration.
+        """
+        logger.info("Running schema migration.")
+        if self.engine is None:
+            raise RuntimeError("Engine must be initialized to run schema migrations.")
+        run_schema_migrations(engine=self.engine)
+        check_schema_migrations(engine=self.engine)
 
     def reset_database(self) -> None:
         """
