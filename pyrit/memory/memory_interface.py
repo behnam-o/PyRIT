@@ -10,7 +10,6 @@ import weakref
 from collections.abc import MutableSequence, Sequence
 from contextlib import closing
 from datetime import datetime, timezone
-from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
 

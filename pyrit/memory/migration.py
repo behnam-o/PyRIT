@@ -114,8 +114,10 @@ def _validate_and_stamp_unversioned_memory_schema(*, config: Config, connection:
         raise RuntimeError(_ERROR_UNVERSIONED_SCHEMA_COMPARISON_FAILED) from e
 
     if diffs:
-        logger.warning(f"Detected {len(diffs)} schema diff(s) in unversioned legacy memory schema. "
-                        "Please address these corrections (or remove your PyRIT DB tables and retry):")
+        logger.warning(
+            f"Detected {len(diffs)} schema diff(s) in unversioned legacy memory schema. "
+            "Please address these corrections (or remove your PyRIT DB tables and retry):"
+        )
         for index, diff in enumerate(diffs, start=1):
             logger.warning(f"Required correction {index}: {diff}")
         raise RuntimeError(_ERROR_UNVERSIONED_SCHEMA_MISMATCH)

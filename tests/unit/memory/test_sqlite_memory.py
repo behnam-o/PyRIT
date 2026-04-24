@@ -8,7 +8,7 @@ import tempfile
 import uuid
 from collections.abc import Sequence
 from datetime import timezone
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy import ARRAY, DateTime, Integer, String, create_engine, inspect, text
@@ -19,7 +19,6 @@ from sqlalchemy.sql.sqltypes import NullType
 
 from pyrit.memory.memory_models import Base, EmbeddingDataEntry, PromptMemoryEntry
 from pyrit.memory.migration import run_schema_migrations
-from pyrit.memory.sqlite_memory import SQLiteMemory
 from pyrit.models import MessagePiece
 from pyrit.prompt_converter.base64_converter import Base64Converter
 from pyrit.prompt_target.text_target import TextTarget
@@ -935,5 +934,3 @@ def test_run_schema_migrations_no_memory_tables():
             }.issubset(table_names)
         finally:
             engine.dispose()
-
-
