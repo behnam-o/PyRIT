@@ -668,7 +668,6 @@ def test_message_piece_to_dict():
         converted_value="Hello",
         conversation_id="test_conversation",
         sequence=1,
-        labels={"label1": "value1"},
         targeted_harm_categories=["violence", "illegal"],
         prompt_metadata={"key": "metadata"},
         converter_identifiers=[
@@ -960,27 +959,6 @@ def test_message_piece_harm_categories_serialization():
     result = entry.to_dict()
     assert "targeted_harm_categories" in result
     assert result["targeted_harm_categories"] == harm_categories
-
-
-def test_message_piece_harm_categories_with_labels():
-    """Test that harm_categories and labels can coexist."""
-    harm_categories = ["violence", "illegal"]
-    labels = {"operation": "test_op", "researcher": "alice"}
-
-    entry = MessagePiece(
-        role="user",
-        original_value="Hello",
-        converted_value="Hello",
-        targeted_harm_categories=harm_categories,
-        labels=labels,
-    )
-
-    assert entry.targeted_harm_categories == harm_categories
-    assert entry.labels == labels
-
-    result = entry.to_dict()
-    assert result["targeted_harm_categories"] == harm_categories
-    assert result["labels"] == labels
 
 
 class TestSimulatedAssistantRole:

@@ -311,7 +311,6 @@ class CrescendoAttack(MultiTurnAttackStrategy[CrescendoAttackContext, CrescendoA
             system_prompt=system_prompt,
             conversation_id=context.session.adversarial_chat_conversation_id,
             attack_identifier=self.get_identifier(),
-            labels=context.memory_labels,
         )
 
         # Initialize backtrack count in context
@@ -534,7 +533,6 @@ class CrescendoAttack(MultiTurnAttackStrategy[CrescendoAttackContext, CrescendoA
                 conversation_id=context.session.adversarial_chat_conversation_id,
                 target=self._adversarial_chat,
                 attack_identifier=self.get_identifier(),
-                labels=context.memory_labels,
             )
 
         if not response:
@@ -620,7 +618,6 @@ class CrescendoAttack(MultiTurnAttackStrategy[CrescendoAttackContext, CrescendoA
                 request_converter_configurations=self._request_converters,
                 response_converter_configurations=self._response_converters,
                 attack_identifier=self.get_identifier(),
-                labels=context.memory_labels,
             )
 
         if not response:

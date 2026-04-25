@@ -412,7 +412,6 @@ def request_piece_to_pyrit_message_piece(
     role: ChatMessageRole,
     conversation_id: str,
     sequence: int,
-    labels: Optional[dict[str, str]] = None,
 ) -> PyritMessagePiece:
     """
     Convert a single request piece DTO to a PyRIT MessagePiece domain object.
@@ -422,7 +421,6 @@ def request_piece_to_pyrit_message_piece(
         role: The message role.
         conversation_id: The conversation/attack ID.
         sequence: The message sequence number.
-        labels: Optional labels to attach to the piece.
 
     Returns:
         PyritMessagePiece domain object.
@@ -442,7 +440,6 @@ def request_piece_to_pyrit_message_piece(
         conversation_id=conversation_id,
         sequence=sequence,
         prompt_metadata=metadata,
-        labels=labels or {},
         original_prompt_id=original_prompt_id,
     )
 
@@ -452,7 +449,6 @@ def request_to_pyrit_message(
     request: AddMessageRequest,
     conversation_id: str,
     sequence: int,
-    labels: Optional[dict[str, str]] = None,
 ) -> PyritMessage:
     """
     Build a PyRIT Message from an AddMessageRequest DTO.
@@ -461,18 +457,13 @@ def request_to_pyrit_message(
         request: The inbound API request.
         conversation_id: The conversation/attack ID.
         sequence: The message sequence number.
-        labels: Optional labels to attach to each piece.
 
     Returns:
         PyritMessage ready to send to the target.
     """
     pieces = [
         request_piece_to_pyrit_message_piece(
-            piece=p,
-            role=request.role,
-            conversation_id=conversation_id,
-            sequence=sequence,
-            labels=labels,
+            piece=p, role=request.role, conversation_id=conversation_id, sequence=sequence
         )
         for p in request.pieces
     ]

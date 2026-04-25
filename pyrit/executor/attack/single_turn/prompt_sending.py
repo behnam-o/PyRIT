@@ -325,7 +325,6 @@ class PromptSendingAttack(SingleTurnAttackStrategy):
                 conversation_id=context.conversation_id,
                 request_converter_configurations=self._request_converters,
                 response_converter_configurations=self._response_converters,
-                labels=context.memory_labels,  # combined with strategy labels at _setup()
                 attack_identifier=self.get_identifier(),
             )
 

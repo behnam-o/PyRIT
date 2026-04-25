@@ -288,7 +288,6 @@ class ChunkedRequestAttack(MultiTurnAttackStrategy[ChunkedRequestAttackContext, 
                     conversation_id=context.session.conversation_id,
                     request_converter_configurations=self._request_converters,
                     response_converter_configurations=self._response_converters,
-                    labels=context.memory_labels,
                     attack_identifier=self.get_identifier(),
                 )
 
