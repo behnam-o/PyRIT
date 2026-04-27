@@ -4,20 +4,21 @@
 import abc
 import atexit
 import logging
+import re
 import uuid
-import warnings
 import weakref
 from collections.abc import MutableSequence, Sequence
 from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, TypeVar, Union
 
-from sqlalchemy import MetaData, and_
+from sqlalchemy import MetaData, and_, not_, or_
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
+from pyrit.common.deprecation import print_deprecation_message
 from pyrit.common.path import DB_DATA_PATH
 from pyrit.identifiers.identifier_filters import IdentifierFilter, IdentifierType
 from pyrit.memory.memory_embedding import (
@@ -60,6 +61,13 @@ logger = logging.getLogger(__name__)
 
 
 Model = TypeVar("Model")
+
+# Label keys are interpolated into backend-specific JSON path expressions
+# (e.g. ``$.key``) in the per-backend label-filter helpers. We restrict keys
+# to a conservative allowlist so a crafted key cannot break out of the JSON
+# path literal and inject SQL. Values are always passed as bound parameters
+# and do not need this restriction.
+_LABEL_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_.\-]+$")
 
 
 class MemoryInterface(abc.ABC):
@@ -244,6 +252,7 @@ class MemoryInterface(abc.ABC):
         property_path: str,
         array_element_path: str | None = None,
         array_to_match: Sequence[str],
+        match_mode: Literal["all", "any"] = "all",
     ) -> Any:
         """
         Return a database-specific condition for matching an array at a given path within a JSON object.
@@ -253,8 +262,13 @@ class MemoryInterface(abc.ABC):
             property_path (str): The JSON path for the target array.
             array_element_path (Optional[str]): An optional JSON path applied to each array item before matching.
             array_to_match (Sequence[str]): The array that must match the extracted JSON array values.
-                For a match, ALL values in this array must be present in the JSON array.
-                If `array_to_match` is empty, the condition matches only if the target is also an empty array or None.
+                Combination semantics for multiple entries are controlled by ``match_mode``.
+                If ``array_to_match`` is empty, the condition matches only if the target is also an
+                empty array or None (overloaded "absence" semantics, regardless of ``match_mode``).
+            match_mode (Literal["all", "any"]): How to combine multiple entries in ``array_to_match``.
+                ``"all"`` (default) requires every listed value to be present in the JSON array.
+                ``"any"`` requires at least one listed value to be present. Ignored when
+                ``array_to_match`` has fewer than 2 entries or is empty.
 
         Returns:
             Any: A database-specific SQLAlchemy condition.
@@ -418,13 +432,18 @@ class MemoryInterface(abc.ABC):
         """
 
     @abc.abstractmethod
-    def _get_attack_result_label_condition(self, *, labels: dict[str, str]) -> Any:
+    def _get_attack_result_label_condition(self, *, labels: dict[str, str | Sequence[str]]) -> Any:
         """
         Return a database-specific condition for filtering AttackResults by labels
         in the associated PromptMemoryEntry records.
 
+        Semantics: entries are AND-combined across label names; within a single
+        entry, a string value is an equality match and a sequence value is an
+        OR match over the listed values. An empty sequence is a no-op for that
+        label. See ``get_attack_results`` for examples.
+
         Args:
-            labels: Dictionary of labels that must ALL be present.
+            labels: Label-name-to-value(s) map.
 
         Returns:
             Database-specific SQLAlchemy condition.
@@ -1481,9 +1500,12 @@ class MemoryInterface(abc.ABC):
         objective_sha256: Optional[Sequence[str]] = None,
         outcome: Optional[str] = None,
         attack_class: Optional[str] = None,
+        attack_classes: Optional[Sequence[str]] = None,
         converter_classes: Optional[Sequence[str]] = None,
+        converter_classes_match: Literal["all", "any"] = "all",
+        has_converters: Optional[bool] = None,
         targeted_harm_categories: Optional[Sequence[str]] = None,
-        labels: Optional[dict[str, str]] = None,
+        labels: Optional[dict[str, str | Sequence[str]]] = None,
         identifier_filters: Optional[Sequence[IdentifierFilter]] = None,
     ) -> Sequence[AttackResult]:
         """
@@ -1497,11 +1519,25 @@ class MemoryInterface(abc.ABC):
                 Defaults to None.
             outcome (Optional[str], optional): The outcome to filter by (success, failure, undetermined).
                 Defaults to None.
-            attack_class (Optional[str], optional): Filter by exact attack class_name in attack_identifier.
-                Defaults to None.
+            attack_class (Optional[str], optional): Deprecated. Filter by a single exact attack
+                class_name in attack_identifier. Equivalent to passing ``attack_classes=[attack_class]``.
+                Cannot be combined with ``attack_classes``. Defaults to None.
+            attack_classes (Optional[Sequence[str]], optional): Filter by exact attack class_name in
+                attack_identifier. Returns attacks matching ANY of the listed class names (OR logic,
+                case-sensitive). An empty sequence applies no filter. Defaults to None.
             converter_classes (Optional[Sequence[str]], optional): Filter by converter class names.
-                Returns only attacks that used ALL specified converters (AND logic, case-insensitive).
-                Defaults to None.
+                Combination semantics for multiple entries are controlled by ``converter_classes_match``.
+                An empty sequence filters to attacks that used no converters; ``None`` applies no
+                filter. To filter by presence/absence of any converter explicitly, use the
+                ``has_converters`` parameter instead. Defaults to None.
+            converter_classes_match (Literal["all", "any"]): How to combine multiple entries in
+                ``converter_classes``. ``"all"`` (default) matches attacks that used every listed
+                converter (AND, case-insensitive). ``"any"`` matches attacks that used at least one
+                listed converter (OR, case-insensitive). Ignored when ``converter_classes`` has
+                fewer than 2 entries or is empty.
+            has_converters (Optional[bool], optional): Filter by converter presence.
+                ``True`` returns only attacks that used at least one converter. ``False`` returns
+                only attacks that used no converters. ``None`` applies no filter. Defaults to None.
             targeted_harm_categories (Optional[Sequence[str]], optional):
                 A list of targeted harm categories to filter results by.
                 These targeted harm categories are associated with the prompts themselves,
@@ -1509,17 +1545,37 @@ class MemoryInterface(abc.ABC):
                 not necessarily one(s) that were found in the response.
                 By providing a list, this means ALL categories in the list must be present.
                 Defaults to None.
-            labels (Optional[dict[str, str]], optional): A dictionary of memory labels to filter results by.
-                These labels are associated with the prompts themselves, used for custom tagging and tracking.
-                Defaults to None.
+            labels (Optional[dict[str, str | Sequence[str]]], optional): Filter results
+                by attack labels. Entries are AND-combined across label names; within a
+                single entry, a string value is an equality match and a sequence value is
+                an OR match over the listed values. An empty sequence applies no filter
+                for that label. Example: ``{"operator": "roakey", "operation":
+                ["roakey_op_a", "roakey_op_b"]}`` matches attacks where ``operator ==
+                "roakey"`` AND (``operation == "roakey_op_a"`` OR ``operation ==
+                "roakey_op_b"``). Defaults to None.
             identifier_filters (Optional[Sequence[IdentifierFilter]], optional):
                 A sequence of IdentifierFilter objects that allows filtering by various attack identifier
                 JSON properties. Defaults to None.
 
         Returns:
             Sequence[AttackResult]: A list of AttackResult objects that match the specified filters.
+
+        Raises:
+            ValueError: If both ``attack_class`` (deprecated) and ``attack_classes`` are provided.
         """
         conditions: list[ColumnElement[bool]] = []
+
+        if attack_class is not None and attack_classes is not None:
+            raise ValueError(
+                "Pass either `attack_class` (deprecated, singular) or `attack_classes` (plural), not both."
+            )
+        if attack_class is not None and attack_classes is None:
+            print_deprecation_message(
+                old_item="get_attack_results(attack_class=...)",
+                new_item="get_attack_results(attack_classes=...)",
+                removed_in="0.15.0",
+            )
+            attack_classes = [attack_class]
 
         if attack_result_ids is not None:
             if len(attack_result_ids) == 0:
@@ -1536,34 +1592,57 @@ class MemoryInterface(abc.ABC):
         if outcome:
             conditions.append(AttackResultEntry.outcome == outcome)
 
-        if attack_class:
-            # Use database-specific JSON query method
+        if attack_classes:
+            # Case-insensitive to mirror converter_classes; forgives casing drift in
+            # REST/CLI callers. PyRIT class names are PascalCase with no case-variant
+            # collisions so this never changes match results for well-formed inputs.
             conditions.append(
-                self._get_condition_json_property_match(
-                    json_column=AttackResultEntry.atomic_attack_identifier,
-                    property_path="$.children.attack_technique.children.attack.class_name",
-                    value=attack_class,
-                    case_sensitive=True,
+                or_(
+                    *[
+                        self._get_condition_json_property_match(
+                            json_column=AttackResultEntry.atomic_attack_identifier,
+                            property_path="$.children.attack_technique.children.attack.class_name",
+                            value=ac,
+                        )
+                        for ac in attack_classes
+                    ]
                 )
             )
 
         if converter_classes is not None:
-            # converter_classes=[] means "only attacks with no converters"
-            # converter_classes=["A","B"] means "must have all listed converters"
+            # Non-empty sequence: filter to attacks that used ALL (or ANY, depending on
+            # converter_classes_match) of the listed converters.
+            # Empty sequence: filter to attacks that used NO converters.
+            # None: no filter.
             conditions.append(
                 self._get_condition_json_array_match(
                     json_column=AttackResultEntry.atomic_attack_identifier,
                     property_path="$.children.attack_technique.children.attack.children.request_converters",
                     array_element_path="$.class_name",
                     array_to_match=converter_classes,
+                    match_mode=converter_classes_match,
                 )
             )
 
+        # Skip when has_converters=True and converter_classes is already non-empty:
+        # the "ALL listed converters" constraint strictly implies "at least one
+        # converter", so adding this predicate is redundant work.
+        if has_converters is not None and not (has_converters is True and converter_classes):
+            # Reuse the array-empty match (array_to_match=[]) as the "no converters"
+            # condition; invert it for "has at least one converter".
+            empty_condition = self._get_condition_json_array_match(
+                json_column=AttackResultEntry.atomic_attack_identifier,
+                property_path="$.children.attack_technique.children.attack.children.request_converters",
+                array_element_path="$.class_name",
+                array_to_match=[],
+            )
+            conditions.append(not_(empty_condition) if has_converters else empty_condition)
+
         if targeted_harm_categories:
-            warnings.warn(
-                "The 'targeted_harm_categories' parameter is deprecated and will be removed in a future release.",
-                DeprecationWarning,
-                stacklevel=2,
+            print_deprecation_message(
+                old_item="get_attack_results(targeted_harm_categories=...)",
+                new_item="get_attack_results(labels={'harm_category': [...]})",
+                removed_in="0.15.0",
             )
             # Use database-specific JSON query method
             conditions.append(
@@ -1571,8 +1650,24 @@ class MemoryInterface(abc.ABC):
             )
 
         if labels:
-            # Use database-specific JSON query method
-            conditions.append(self._get_attack_result_label_condition(labels=labels))
+            # Strip keys whose value is an empty sequence — an empty sequence means
+            # "no OR-candidates", and per the docstring applies no filter for that
+            # key. Without this, the per-backend helpers would still emit a base
+            # EXISTS(... labels IS NOT NULL) predicate that is strictly more
+            # restrictive than "no filter".
+            effective_labels = {k: v for k, v in labels.items() if not (isinstance(v, (list, tuple)) and len(v) == 0)}
+            # Validate label keys against an allowlist: backend helpers
+            # interpolate keys into JSON path expressions (e.g. ``$.key``),
+            # so a key with quotes or SQL punctuation could otherwise break
+            # out and inject SQL.
+            invalid_keys = [k for k in effective_labels if not _LABEL_KEY_PATTERN.match(k)]
+            if invalid_keys:
+                raise ValueError(
+                    f"Invalid label key(s) {invalid_keys!r}: keys must match {_LABEL_KEY_PATTERN.pattern}."
+                )
+            if effective_labels:
+                # Use database-specific JSON query method
+                conditions.append(self._get_attack_result_label_condition(labels=effective_labels))
 
         if identifier_filters:
             conditions.extend(
