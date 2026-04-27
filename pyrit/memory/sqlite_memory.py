@@ -605,32 +605,43 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         SQLite implementation for filtering AttackResults by labels.
         Uses json_extract() function specific to SQLite.
 
+        Matches if labels are on any associated PromptMemoryEntry OR directly
+        on the AttackResultEntry itself.
+
         Keys are AND-combined. For each key, a string value is an equality match;
         a sequence value is an OR-within-key match (any listed value matches).
         Empty sequences are no-ops (no constraint on that key).
 
         Returns:
-            Any: A SQLAlchemy subquery for filtering by labels.
+            Any: A SQLAlchemy condition for filtering by labels.
         """
         from sqlalchemy import and_, exists, func
 
         from pyrit.memory.memory_models import AttackResultEntry, PromptMemoryEntry
 
-        per_key_conditions = []
+        per_key_pme_conditions = []
+        per_key_are_conditions = []
         for key, raw_value in labels.items():
             values = [raw_value] if isinstance(raw_value, str) else list(raw_value)
             if not values:
                 continue
-            col = func.json_extract(PromptMemoryEntry.labels, f"$.{key}")
-            per_key_conditions.append(col.in_(values))
+            pme_col = func.json_extract(PromptMemoryEntry.labels, f"$.{key}")
+            per_key_pme_conditions.append(pme_col.in_(values))
+            are_col = func.json_extract(AttackResultEntry.labels, f"$.{key}")
+            per_key_are_conditions.append(are_col.in_(values))
 
-        return exists().where(
+        pme_match = exists().where(
             and_(
                 PromptMemoryEntry.conversation_id == AttackResultEntry.conversation_id,
                 PromptMemoryEntry.labels.isnot(None),
-                and_(*per_key_conditions),
+                and_(*per_key_pme_conditions),
             )
         )
+        are_match = and_(
+            AttackResultEntry.labels.isnot(None),
+            *per_key_are_conditions,
+        )
+        return or_(pme_match, are_match)
 
     def get_unique_attack_class_names(self) -> list[str]:
         """

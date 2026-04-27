@@ -9,7 +9,7 @@ from contextlib import closing, suppress
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Literal, Optional, TypeVar, Union, cast
 
-from sqlalchemy import and_, create_engine, event, exists, text
+from sqlalchemy import and_, create_engine, event, exists, or_, text
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import InstrumentedAttribute, joinedload, sessionmaker
@@ -450,36 +450,66 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
         """
         Azure SQL implementation for filtering AttackResults by labels.
 
+        Matches if labels are on any associated PromptMemoryEntry OR directly
+        on the AttackResultEntry itself.
+
         Uses JSON_VALUE() with parameterized IN clauses. See
         ``MemoryInterface._get_attack_result_label_condition`` for semantics.
 
         Returns:
-            Any: SQLAlchemy exists subquery condition with bound parameters.
+            Any: SQLAlchemy condition with bound parameters.
         """
-        label_conditions: list[str] = []
-        bindparams_dict: dict[str, str] = {}
+        # Build conditions for PromptMemoryEntry labels (via exists subquery)
+        pme_label_conditions: list[str] = []
+        pme_bindparams: dict[str, str] = {}
+        # Build conditions for AttackResultEntry labels (direct match)
+        are_label_conditions: list[str] = []
+        are_bindparams: dict[str, str] = {}
+
         for key, raw_value in labels.items():
             values = [raw_value] if isinstance(raw_value, str) else list(raw_value)
             if not values:
                 continue
-            placeholders = []
+            pme_placeholders = []
+            are_placeholders = []
             for idx, v in enumerate(values):
-                param_name = f"label_{key}_{idx}"
-                placeholders.append(f":{param_name}")
-                bindparams_dict[param_name] = str(v)
-            label_conditions.append(f"JSON_VALUE(labels, '$.{key}') IN ({', '.join(placeholders)})")
+                pme_param = f"pme_label_{key}_{idx}"
+                pme_placeholders.append(f":{pme_param}")
+                pme_bindparams[pme_param] = str(v)
+                are_param = f"are_label_{key}_{idx}"
+                are_placeholders.append(f":{are_param}")
+                are_bindparams[are_param] = str(v)
+            pme_label_conditions.append(f"JSON_VALUE(labels, '$.{key}') IN ({', '.join(pme_placeholders)})")
+            are_label_conditions.append(f"JSON_VALUE(labels, '$.{key}') IN ({', '.join(are_placeholders)})")
 
-        base = [
+        # PromptMemoryEntry subquery
+        pme_base: list[Any] = [
             PromptMemoryEntry.conversation_id == AttackResultEntry.conversation_id,
             PromptMemoryEntry.labels.isnot(None),
         ]
-        if label_conditions:
-            combined = " AND ".join(label_conditions)
-            base.append(
-                cast("ColumnElement[bool]", text(f"ISJSON(labels) = 1 AND {combined}").bindparams(**bindparams_dict))
+        if pme_label_conditions:
+            combined_pme = " AND ".join(pme_label_conditions)
+            pme_base.append(
+                cast(
+                    "ColumnElement[bool]",
+                    text(f"ISJSON(labels) = 1 AND {combined_pme}").bindparams(**pme_bindparams),
+                )
             )
+        pme_match = exists().where(and_(*pme_base))
 
-        return exists().where(and_(*base))
+        # Direct AttackResultEntry label match
+        are_parts: list[Any] = [AttackResultEntry.labels.isnot(None)]
+        if are_label_conditions:
+            combined_are = " AND ".join(are_label_conditions)
+            are_parts.append(
+                cast(
+                    "ColumnElement[bool]",
+                    text(f"ISJSON(labels) = 1 AND {combined_are}").bindparams(**are_bindparams),
+                )
+            )
+        are_match = and_(*are_parts)
+
+        return or_(pme_match, are_match)
 
     def get_unique_attack_class_names(self) -> list[str]:
         """

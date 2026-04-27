@@ -434,8 +434,11 @@ class MemoryInterface(abc.ABC):
     @abc.abstractmethod
     def _get_attack_result_label_condition(self, *, labels: dict[str, str | Sequence[str]]) -> Any:
         """
-        Return a database-specific condition for filtering AttackResults by labels
-        in the associated PromptMemoryEntry records.
+        Return a database-specific condition for filtering AttackResults by labels.
+
+        Matches if the labels are present on **either** an associated
+        PromptMemoryEntry (via conversation_id) **or** directly on the
+        AttackResultEntry itself.
 
         Semantics: entries are AND-combined across label names; within a single
         entry, a string value is an equality match and a sequence value is an
