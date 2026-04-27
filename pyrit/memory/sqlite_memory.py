@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, Optional, TypeVar, Union, cast
 
-from sqlalchemy import and_, create_engine, func, or_, text
+from sqlalchemy import and_, create_engine, exists, func, or_, text
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import InstrumentedAttribute, joinedload, sessionmaker
@@ -142,21 +142,37 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         result: Sequence[EmbeddingDataEntry] = self._query_entries(EmbeddingDataEntry)
         return result
 
-    def _get_message_pieces_memory_label_conditions(self, *, memory_labels: dict[str, str]) -> list[TextClause]:
+    def _get_message_pieces_memory_label_conditions(self, *, memory_labels: dict[str, str]) -> list[Any]:
         """
         Generate SQLAlchemy filter conditions for filtering conversation pieces by memory labels.
         For SQLite, we use JSON_EXTRACT function to handle JSON fields.
 
+        Matches if labels are on the PromptMemoryEntry itself OR on any
+        AttackResultEntry that shares the same conversation_id.
+
         Returns:
             list: A list of SQLAlchemy conditions.
         """
-        # For SQLite, we use JSON_EXTRACT with text() and bindparams similar to Azure SQL approach
-        json_conditions = " AND ".join([f"JSON_EXTRACT(labels, '$.{key}') = :{key}" for key in memory_labels])
+        per_key_pme_conditions = []
+        per_key_are_conditions = []
+        for key, value in memory_labels.items():
+            pme_col = func.json_extract(PromptMemoryEntry.labels, f"$.{key}")
+            per_key_pme_conditions.append(pme_col == str(value))
+            are_col = func.json_extract(AttackResultEntry.labels, f"$.{key}")
+            per_key_are_conditions.append(are_col == str(value))
 
-        # Create SQL condition using SQLAlchemy's text() with bindparams
-        # for safe parameter passing, preventing SQL injection
-        condition = text(json_conditions).bindparams(**{key: str(value) for key, value in memory_labels.items()})
-        return [condition]
+        pme_match = and_(
+            PromptMemoryEntry.labels.isnot(None),
+            *per_key_pme_conditions,
+        )
+        are_match = exists().where(
+            and_(
+                AttackResultEntry.conversation_id == PromptMemoryEntry.conversation_id,
+                AttackResultEntry.labels.isnot(None),
+                *per_key_are_conditions,
+            )
+        )
+        return [or_(pme_match, are_match)]
 
     def _get_message_pieces_prompt_metadata_conditions(
         self, *, prompt_metadata: dict[str, Union[str, int]]

@@ -269,6 +269,35 @@ def test_get_attack_result_label_condition_multiple_labels(memory_interface: Azu
     assert "PromptMemoryEntries" in compiled
 
 
+def test_get_message_pieces_memory_label_conditions_single_label(memory_interface: AzureSQLMemory):
+    """Test that _get_message_pieces_memory_label_conditions builds a valid OR condition."""
+    conditions = memory_interface._get_message_pieces_memory_label_conditions(memory_labels={"operation": "test_op"})
+    assert len(conditions) == 1
+    compiled = str(conditions[0].compile(compile_kwargs={"literal_binds": False}))
+    assert "ISJSON" in compiled
+    assert "JSON_VALUE" in compiled
+
+
+def test_get_message_pieces_memory_label_conditions_includes_ar_fallback(memory_interface: AzureSQLMemory):
+    """Test that the condition references both PME and AR tables for the OR fallback."""
+    conditions = memory_interface._get_message_pieces_memory_label_conditions(
+        memory_labels={"operation": "test_op", "operator": "roakey"}
+    )
+    compiled = str(conditions[0].compile(compile_kwargs={"literal_binds": False}))
+    assert "AttackResultEntries" in compiled
+    assert "PromptMemoryEntries" in compiled
+
+
+def test_get_message_pieces_memory_label_conditions_bind_params(memory_interface: AzureSQLMemory):
+    """Test that bind parameters are created for both PME and AR branches."""
+    conditions = memory_interface._get_message_pieces_memory_label_conditions(memory_labels={"operation": "test_op"})
+    params = conditions[0].compile().params
+    # PME branch param
+    assert params.get("pme_ml_operation") == "test_op"
+    # AR branch param
+    assert params.get("are_ml_operation") == "test_op"
+
+
 def test_update_entries(memory_interface: AzureSQLMemory):
     # Insert a test entry
     entry = PromptMemoryEntry(
