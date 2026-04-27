@@ -114,6 +114,24 @@ class TestFrontendCore:
         assert context._initialized is True
         assert registry is not None
 
+    def test_scenario_registry_raises_when_none_after_init(self):
+        """Test scenario_registry raises ValueError when registry is None despite _initialized=True."""
+        context = frontend_core.FrontendCore()
+        context._initialized = True
+        context._scenario_registry = None
+
+        with pytest.raises(ValueError, match="self._scenario_registry is not initialized"):
+            _ = context.scenario_registry
+
+    def test_initializer_registry_raises_when_none_after_init(self):
+        """Test initializer_registry raises ValueError when registry is None despite _initialized=True."""
+        context = frontend_core.FrontendCore()
+        context._initialized = True
+        context._initializer_registry = None
+
+        with pytest.raises(ValueError, match="self._initializer_registry is not initialized"):
+            _ = context.initializer_registry
+
 
 class TestValidationFunctions:
     """Tests for validation functions."""
@@ -278,6 +296,19 @@ class TestListFunctions:
         for name in names:
             assert "." in name, f"Scenario name '{name}' should be a dotted name (package.module)"
             assert name == name.lower(), f"Scenario name '{name}' should be lowercase"
+
+    def test_discover_builtin_scenarios_excludes_deprecated_aliases(self):
+        """Deprecated alias scenarios like ContentHarms must not appear in the registry."""
+        from pyrit.registry.class_registries.scenario_registry import ScenarioRegistry
+
+        registry = ScenarioRegistry()
+        registry._discover_builtin_scenarios()
+
+        names = set(registry._class_entries.keys())
+        class_names = {entry.registered_class.__name__ for entry in registry._class_entries.values()}
+
+        assert "airt.content_harms" not in names, "Deprecated 'airt.content_harms' should not be registered"
+        assert "ContentHarms" not in class_names, "ContentHarms class should not appear under any registry name"
 
     async def test_list_scenarios(self):
         """Test list_scenarios_async returns scenarios from registry."""

@@ -400,7 +400,7 @@ class ScoreEntry(Base):
         self.score_type = entry.score_type
         self.score_category = entry.score_category
         self.score_rationale = entry.score_rationale
-        self.score_metadata = entry.score_metadata
+        self.score_metadata = entry.score_metadata  # type: ignore[assignment]
         # Normalize to ComponentIdentifier (handles dict with deprecation warning) then convert to dict for JSON storage
         normalized_scorer = ComponentIdentifier.normalize(entry.scorer_class_identifier)
         # Ensure eval_hash is set before truncation so it survives the DB round-trip
@@ -441,7 +441,7 @@ class ScoreEntry(Base):
             score_category=self.score_category,
             score_rationale=self.score_rationale,
             score_metadata=self.score_metadata,
-            scorer_class_identifier=scorer_identifier,
+            scorer_class_identifier=scorer_identifier,  # type: ignore[arg-type]
             message_piece_id=self.prompt_request_response_id,
             timestamp=_ensure_utc(self.timestamp),
             objective=self.objective,
@@ -593,7 +593,7 @@ class SeedEntry(Base):
         self.source = entry.source
         self.date_added = entry.date_added
         self.added_by = entry.added_by
-        self.prompt_metadata = entry.metadata
+        self.prompt_metadata = entry.metadata  # type: ignore[assignment]
         self.prompt_group_id = entry.prompt_group_id
         self.seed_type = seed_type
 
@@ -601,11 +601,11 @@ class SeedEntry(Base):
         if isinstance(entry, SeedPrompt):
             self.parameters = list(entry.parameters) if entry.parameters else None
             self.sequence = entry.sequence
-            self.role = entry.role
+            self.role = entry.role  # type: ignore[assignment]
         else:
             self.parameters = None
             self.sequence = None
-            self.role = None
+            self.role = None  # type: ignore[assignment]
 
     def get_seed(self) -> Seed:
         """
@@ -673,7 +673,7 @@ class SeedEntry(Base):
             metadata=self.prompt_metadata,
             parameters=self.parameters,
             prompt_group_id=self.prompt_group_id,
-            sequence=self.sequence,
+            sequence=self.sequence or 0,
             role=self.role,
         )
 
@@ -953,6 +953,7 @@ class ScenarioResultEntry(Base):
         String, nullable=False, default="CREATED"
     )
     attack_results_json: Mapped[str] = mapped_column(Unicode, nullable=False)
+    display_group_map_json: Mapped[Optional[str]] = mapped_column(Unicode, nullable=True)
     labels: Mapped[Optional[dict[str, str]]] = mapped_column(JSON, nullable=True)
     number_tries: Mapped[int] = mapped_column(INTEGER, nullable=False, default=0)
     completion_time = mapped_column(DateTime, nullable=False)
@@ -1000,6 +1001,9 @@ class ScenarioResultEntry(Base):
             serialized_attack_results[attack_name] = [result.conversation_id for result in results]
         self.attack_results_json = json.dumps(serialized_attack_results)
 
+        # Serialize display_group_map if present
+        self.display_group_map_json = json.dumps(entry._display_group_map) if entry._display_group_map else None
+
         self.timestamp = datetime.now(tz=timezone.utc)
 
     def get_scenario_result(self) -> ScenarioResult:
@@ -1036,16 +1040,22 @@ class ScenarioResultEntry(Base):
         # Convert dict back to ComponentIdentifier for reconstruction
         target_identifier = ComponentIdentifier.from_dict(self.objective_target_identifier)
 
+        # Deserialize display_group_map if stored
+        display_group_map: dict[str, str] | None = None
+        if self.display_group_map_json:
+            display_group_map = json.loads(self.display_group_map_json)
+
         return ScenarioResult(
             id=self.id,
             scenario_identifier=scenario_identifier,
             objective_target_identifier=target_identifier,
             attack_results=attack_results,
-            objective_scorer_identifier=scorer_identifier,
+            objective_scorer_identifier=scorer_identifier,  # type: ignore[arg-type]
             scenario_run_state=self.scenario_run_state,
             labels=self.labels,
             number_tries=self.number_tries,
             completion_time=self.completion_time,
+            display_group_map=display_group_map,
         )
 
     def get_conversation_ids_by_attack_name(self) -> dict[str, list[str]]:

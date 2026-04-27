@@ -9,6 +9,7 @@ AIRT configuration including converters, scorers, and targets using Azure OpenAI
 """
 
 import json
+import logging
 import os
 from collections.abc import Callable
 
@@ -37,6 +38,8 @@ from pyrit.score import (
 )
 from pyrit.score.float_scale.self_ask_scale_scorer import SelfAskScaleScorer
 from pyrit.setup.initializers.pyrit_initializer import PyRITInitializer
+
+logger = logging.getLogger(__name__)
 
 
 class AIRTInitializer(PyRITInitializer):
@@ -110,6 +113,9 @@ class AIRTInitializer(PyRITInitializer):
         2. Composite harm and objective scorers
         3. Adversarial target configurations
         4. Default values for all attack types
+
+        Raises:
+            ValueError: If required environment variables are not set.
         """
         # Ensure operator, operation, and email are populated from GLOBAL_MEMORY_LABELS.
         self._validate_operation_fields()
@@ -121,8 +127,10 @@ class AIRTInitializer(PyRITInitializer):
         scorer_model_name = os.getenv("AZURE_OPENAI_GPT4O_UNSAFE_CHAT_MODEL2")
 
         # Type assertions - safe because validate() already checked these
-        assert converter_endpoint is not None
-        assert scorer_endpoint is not None
+        if converter_endpoint is None:
+            raise ValueError("converter_endpoint is not initialized")
+        if scorer_endpoint is None:
+            raise ValueError("scorer_endpoint is not initialized")
         # model name can be empty in certain cases (e.g., custom model deployments that don't need model name)
 
         # Check for API keys first, fall back to Entra auth if not set
@@ -137,7 +145,7 @@ class AIRTInitializer(PyRITInitializer):
 
         # 1. Setup converter target
         self._setup_converter_target(
-            endpoint=converter_endpoint, api_key=converter_api_key, model_name=converter_model_name
+            endpoint=converter_endpoint, api_key=converter_api_key, model_name=converter_model_name or ""
         )
 
         # 2. Setup scorers
@@ -145,12 +153,12 @@ class AIRTInitializer(PyRITInitializer):
             endpoint=scorer_endpoint,
             api_key=scorer_api_key,
             content_safety_api_key=content_safety_api_key,
-            model_name=scorer_model_name,
+            model_name=scorer_model_name or "",
         )
 
         # 3. Setup adversarial targets
         self._setup_adversarial_targets(
-            endpoint=converter_endpoint, api_key=converter_api_key, model_name=converter_model_name
+            endpoint=converter_endpoint, api_key=converter_api_key, model_name=converter_model_name or ""
         )
 
     def _setup_converter_target(self, *, endpoint: str, api_key: str, model_name: str) -> None:
@@ -270,32 +278,43 @@ class AIRTInitializer(PyRITInitializer):
 
     def _validate_operation_fields(self) -> None:
         """
-        Check that mandatory global memory labels (operation, operator)
-        are populated.
+        Ensure operator and operation are populated in GLOBAL_MEMORY_LABELS.
+
+        Reads operator/operation from .pyrit_conf if it exists, then merges
+        them into GLOBAL_MEMORY_LABELS. In container/GUI deployments where
+        .pyrit_conf is not present, the labels are set per-user by the GUI
+        at runtime, so this method is a no-op.
 
         Raises:
-            ValueError: If mandatory global memory labels are missing.
+            ValueError: If .pyrit_conf exists but is missing operator or operation.
         """
-        with open(DEFAULT_CONFIG_PATH) as f:
-            data = yaml.load(f, Loader=yaml.SafeLoader)
-
-        if "operator" not in data:
-            raise ValueError(
-                "Error: `operator` was not set in .pyrit_conf. This is a required value for the AIRTInitializer."
-            )
-
-        if "operation" not in data:
-            raise ValueError(
-                "Error: `operation` was not set in .pyrit_conf. This is a required value for the AIRTInitializer."
-            )
-
         raw_labels = os.environ.get("GLOBAL_MEMORY_LABELS")
         labels = dict(json.loads(raw_labels)) if raw_labels else {}
 
-        if "operator" not in labels:
-            labels["operator"] = data["operator"]
+        if DEFAULT_CONFIG_PATH.exists():
+            with open(DEFAULT_CONFIG_PATH) as f:
+                data = yaml.load(f, Loader=yaml.SafeLoader) or {}
 
-        if "operation" not in labels:
-            labels["operation"] = data["operation"]
+            if "operator" not in data:
+                raise ValueError(
+                    "Error: `operator` was not set in .pyrit_conf. This is a required value for the AIRTInitializer."
+                )
 
-        os.environ["GLOBAL_MEMORY_LABELS"] = json.dumps(labels)
+            if "operation" not in data:
+                raise ValueError(
+                    "Error: `operation` was not set in .pyrit_conf. This is a required value for the AIRTInitializer."
+                )
+
+            if "operator" not in labels:
+                labels["operator"] = data["operator"]
+
+            if "operation" not in labels:
+                labels["operation"] = data["operation"]
+
+            os.environ["GLOBAL_MEMORY_LABELS"] = json.dumps(labels)
+        else:
+            logger.info(
+                "No .pyrit_conf found at %s — skipping operator/operation validation. "
+                "In GUI mode, these labels are set per-user at runtime.",
+                DEFAULT_CONFIG_PATH,
+            )
