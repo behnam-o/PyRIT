@@ -54,6 +54,9 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
     TOKEN_URL = "https://database.windows.net/.default"  # The token URL for any Azure SQL database
     AZURE_SQL_DB_CONNECTION_STRING = "AZURE_SQL_DB_CONNECTION_STRING"
 
+    # Azure SQL supports up to 2100 parameters per statement
+    _MAX_BIND_VARS: int = 2000
+
     # Azure Storage Account Container datasets and results environment variables
     AZURE_STORAGE_ACCOUNT_DB_DATA_CONTAINER_URL: str = "AZURE_STORAGE_ACCOUNT_DB_DATA_CONTAINER_URL"
     AZURE_STORAGE_ACCOUNT_DB_DATA_SAS_TOKEN: str = "AZURE_STORAGE_ACCOUNT_DB_DATA_SAS_TOKEN"
