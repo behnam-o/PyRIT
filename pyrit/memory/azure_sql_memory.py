@@ -251,7 +251,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
 
         for key, value in memory_labels.items():
             pme_param = f"pme_ml_{key}"
-            pme_label_parts.append(f"JSON_VALUE(labels, '$.{key}') = :{pme_param}")
+            pme_label_parts.append(f"JSON_VALUE(\"PromptMemoryEntries\".labels, '$.{key}') = :{pme_param}")
             pme_bindparams[pme_param] = str(value)
 
             are_param = f"are_ml_{key}"
@@ -264,7 +264,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
             PromptMemoryEntry.labels.isnot(None),
             cast(
                 "ColumnElement[bool]",
-                text(f"ISJSON(labels) = 1 AND {combined_pme}").bindparams(**pme_bindparams),
+                text(f'ISJSON("PromptMemoryEntries".labels) = 1 AND {combined_pme}').bindparams(**pme_bindparams),
             ),
         )
 
@@ -516,8 +516,10 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
                 are_param = f"are_label_{key}_{idx}"
                 are_placeholders.append(f":{are_param}")
                 are_bindparams[are_param] = str(v)
-            pme_label_conditions.append(f"JSON_VALUE(labels, '$.{key}') IN ({', '.join(pme_placeholders)})")
-            are_label_conditions.append(f"JSON_VALUE(labels, '$.{key}') IN ({', '.join(are_placeholders)})")
+            pme_in = ", ".join(pme_placeholders)
+            pme_label_conditions.append(f"JSON_VALUE(\"PromptMemoryEntries\".labels, '$.{key}') IN ({pme_in})")
+            are_in = ", ".join(are_placeholders)
+            are_label_conditions.append(f"JSON_VALUE(\"AttackResultEntries\".labels, '$.{key}') IN ({are_in})")
 
         # PromptMemoryEntry subquery
         pme_base: list[Any] = [
@@ -529,7 +531,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
             pme_base.append(
                 cast(
                     "ColumnElement[bool]",
-                    text(f"ISJSON(labels) = 1 AND {combined_pme}").bindparams(**pme_bindparams),
+                    text(f'ISJSON("PromptMemoryEntries".labels) = 1 AND {combined_pme}').bindparams(**pme_bindparams),
                 )
             )
         pme_match = exists().where(and_(*pme_base))
@@ -541,7 +543,7 @@ class AzureSQLMemory(MemoryInterface, metaclass=Singleton):
             are_parts.append(
                 cast(
                     "ColumnElement[bool]",
-                    text(f"ISJSON(labels) = 1 AND {combined_are}").bindparams(**are_bindparams),
+                    text(f'ISJSON("AttackResultEntries".labels) = 1 AND {combined_are}').bindparams(**are_bindparams),
                 )
             )
         are_match = and_(*are_parts)

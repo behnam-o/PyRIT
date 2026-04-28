@@ -595,10 +595,6 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         Returns:
             Any: A SQLAlchemy subquery for filtering by targeted harm categories.
         """
-        from sqlalchemy import and_, exists, func
-
-        from pyrit.memory.memory_models import AttackResultEntry, PromptMemoryEntry
-
         targeted_harm_categories_subquery = exists().where(
             and_(
                 PromptMemoryEntry.conversation_id == AttackResultEntry.conversation_id,
@@ -631,10 +627,6 @@ class SQLiteMemory(MemoryInterface, metaclass=Singleton):
         Returns:
             Any: A SQLAlchemy condition for filtering by labels.
         """
-        from sqlalchemy import and_, exists, func
-
-        from pyrit.memory.memory_models import AttackResultEntry, PromptMemoryEntry
-
         per_key_pme_conditions = []
         per_key_are_conditions = []
         for key, raw_value in labels.items():
