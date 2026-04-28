@@ -1222,6 +1222,39 @@ def test_get_unique_attack_labels_non_dict_labels_skipped(sqlite_instance: Memor
     assert result == {"env": ["prod"]}
 
 
+def test_get_unique_attack_labels_from_attack_result_entry(sqlite_instance: MemoryInterface):
+    """Labels stored directly on AttackResultEntry are included."""
+    ar = create_attack_result("conv_1", 1, labels={"source": "are_only"})
+    sqlite_instance.add_attack_results_to_memory(attack_results=[ar])
+
+    result = sqlite_instance.get_unique_attack_labels()
+    assert result == {"source": ["are_only"]}
+
+
+def test_get_unique_attack_labels_merges_pme_and_are_labels(sqlite_instance: MemoryInterface):
+    """Labels from both PME and ARE are merged (OR logic)."""
+    msg = create_message_piece("conv_1", 1, labels={"env": "prod"})
+    sqlite_instance.add_message_pieces_to_memory(message_pieces=[msg])
+
+    ar = create_attack_result("conv_1", 1, labels={"team": "red"})
+    sqlite_instance.add_attack_results_to_memory(attack_results=[ar])
+
+    result = sqlite_instance.get_unique_attack_labels()
+    assert result == {"env": ["prod"], "team": ["red"]}
+
+
+def test_get_unique_attack_labels_deduplicates_across_sources(sqlite_instance: MemoryInterface):
+    """Identical key-value pairs from PME and ARE are not duplicated."""
+    msg = create_message_piece("conv_1", 1, labels={"env": "prod"})
+    sqlite_instance.add_message_pieces_to_memory(message_pieces=[msg])
+
+    ar = create_attack_result("conv_1", 1, labels={"env": "prod"})
+    sqlite_instance.add_attack_results_to_memory(attack_results=[ar])
+
+    result = sqlite_instance.get_unique_attack_labels()
+    assert result == {"env": ["prod"]}
+
+
 # ============================================================================
 # Attack class and converter class filtering tests
 # ============================================================================

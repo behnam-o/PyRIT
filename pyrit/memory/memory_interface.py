@@ -1888,11 +1888,11 @@ class MemoryInterface(abc.ABC):
         """
         Return all unique label key-value pairs across attack results.
 
-        Labels live on ``PromptMemoryEntry.labels`` (the established SDK
-        path).  This method JOINs with ``AttackResultEntry`` to scope the
-        query to conversations that belong to an attack, applies DISTINCT
-        to reduce duplicate label dicts, then aggregates unique key-value
-        pairs in Python.
+        Labels may live on ``PromptMemoryEntry.labels`` (joined via
+        conversation_id) **or** directly on ``AttackResultEntry.labels``.
+        Both sources are queried (OR logic, mirroring the label filter
+        behaviour in ``get_attack_results``), and unique key-value pairs
+        are aggregated in Python.
 
         Returns:
             dict[str, list[str]]: Mapping of label keys to sorted lists of
@@ -1901,7 +1901,8 @@ class MemoryInterface(abc.ABC):
         label_values: dict[str, set[str]] = {}
 
         with closing(self.get_session()) as session:
-            rows = (
+            # Labels from PromptMemoryEntry linked to an attack
+            pme_rows = (
                 session.query(PromptMemoryEntry.labels)
                 .join(
                     AttackResultEntry,
@@ -1912,7 +1913,12 @@ class MemoryInterface(abc.ABC):
                 .all()
             )
 
-        for (labels,) in rows:
+            # Labels directly on AttackResultEntry
+            are_rows = (
+                session.query(AttackResultEntry.labels).filter(AttackResultEntry.labels.isnot(None)).distinct().all()
+            )
+
+        for (labels,) in (*pme_rows, *are_rows):
             if not isinstance(labels, dict):
                 continue
             for key, value in labels.items():
