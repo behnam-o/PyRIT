@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union, get_args
 from uuid import uuid4
 
+from pyrit.common.deprecation import print_deprecation_message
 from pyrit.identifiers.component_identifier import ComponentIdentifier
 from pyrit.models.literals import ChatMessageRole, PromptDataType, PromptResponseError
 
@@ -69,6 +70,7 @@ class MessagePiece:
                 Defaults to None.
             sequence: The order of the conversation within a conversation_id. Defaults to -1.
             labels: The labels associated with the memory entry. Several can be standardized. Defaults to None.
+                Deprecated: This parameter will be removed in a future release.
             prompt_metadata: The metadata associated with the prompt. This can be specific to any scenarios.
                 Because memory is how components talk with each other, this can be component specific.
                 e.g. the URI from a file uploaded to a blob store, or a document type you want to upload.
@@ -117,6 +119,12 @@ class MessagePiece:
             self.timestamp = timestamp.replace(tzinfo=timezone.utc)
         else:
             self.timestamp = timestamp
+        if labels is not None:
+            print_deprecation_message(
+                old_item="MessagePiece(..., labels=...)",
+                new_item="MessagePiece(...)",
+                removed_in="0.16.0",
+            )
         self.labels = labels or {}
         self.prompt_metadata = prompt_metadata or {}
 
