@@ -424,7 +424,7 @@ def request_piece_to_pyrit_message_piece(
         conversation_id: The conversation/attack ID.
         sequence: The message sequence number.
         labels: Optional labels to attach to the piece.
-            Deprecated: This parameter will be removed in a future release.
+            Deprecated: This parameter will be removed in a release 0.16.0.
 
     Returns:
         PyritMessagePiece domain object.
@@ -470,7 +470,7 @@ def request_to_pyrit_message(
         conversation_id: The conversation/attack ID.
         sequence: The message sequence number.
         labels: Optional labels to attach to each piece.
-            Deprecated: This parameter will be removed in a future release.
+            Deprecated: This parameter will be removed in a release 0.16.0.
 
     Returns:
         PyritMessage ready to send to the target.

@@ -853,7 +853,7 @@ class AttackService:
         # Apply optional overrides to the fresh pieces before persisting
         for piece in all_pieces:
             if labels_override is not None:
-                piece.labels = dict(labels_override)
+                piece.labels = dict(labels_override)  # deprecated
             if remap_assistant_to_simulated and piece.api_role == "assistant":
                 piece._role = "simulated_assistant"
 

@@ -77,7 +77,7 @@ def get_adversarial_chat_messages(
         attack_identifier (ComponentIdentifier): Attack identifier to associate with messages.
         adversarial_chat_target_identifier (ComponentIdentifier): Target identifier for the adversarial chat.
         labels: Optional labels to associate with the messages.
-            Deprecated: This parameter will be removed in a future release.
+            Deprecated: This parameter will be removed in a release 0.16.0.
 
     Returns:
         List of transformed messages with swapped roles and new IDs.
@@ -263,7 +263,7 @@ class ConversationManager:
             conversation_id: Unique identifier for the conversation.
             system_prompt: The system prompt text.
             labels: Optional labels to associate with the system prompt.
-                Deprecated: This parameter will be removed in a future release.
+                Deprecated: This parameter will be removed in a release 0.16.0.
         """
         if labels is not None:
             print_deprecation_message(

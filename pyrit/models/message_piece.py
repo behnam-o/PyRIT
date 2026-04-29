@@ -70,7 +70,7 @@ class MessagePiece:
                 Defaults to None.
             sequence: The order of the conversation within a conversation_id. Defaults to -1.
             labels: The labels associated with the memory entry. Several can be standardized. Defaults to None.
-                Deprecated: This parameter will be removed in a future release.
+                Deprecated: This parameter will be removed in a release 0.16.0.
             prompt_metadata: The metadata associated with the prompt. This can be specific to any scenarios.
                 Because memory is how components talk with each other, this can be component specific.
                 e.g. the URI from a file uploaded to a blob store, or a document type you want to upload.
@@ -220,7 +220,7 @@ class MessagePiece:
             source: The piece whose lineage metadata is authoritative.
         """
         self.conversation_id = source.conversation_id
-        self.labels = dict(source.labels)
+        self.labels = dict(source.labels)  # deprecated
         self.attack_identifier = source.attack_identifier
         self.prompt_target_identifier = source.prompt_target_identifier
         self.prompt_metadata = dict(source.prompt_metadata)
@@ -335,7 +335,7 @@ class MessagePiece:
             "conversation_id": self.conversation_id,
             "sequence": self.sequence,
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
-            "labels": self.labels,
+            "labels": self.labels,  # deprecated
             "targeted_harm_categories": self.targeted_harm_categories if self.targeted_harm_categories else None,
             "prompt_metadata": self.prompt_metadata,
             "converter_identifiers": [conv.to_dict() for conv in self.converter_identifiers],
