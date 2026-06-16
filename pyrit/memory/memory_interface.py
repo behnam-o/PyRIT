@@ -30,6 +30,7 @@ from pyrit.memory.memory_models import (
     ScenarioResultEntry,
     ScoreEntry,
     SeedEntry,
+    TargetDefinitionEntry,
 )
 from pyrit.memory.storage import (
     DataTypeSerializer,
@@ -51,6 +52,7 @@ from pyrit.models import (
     SeedDataset,
     SeedGroup,
     SeedType,
+    TargetDefinition,
     group_conversation_message_pieces_by_sequence,
     sort_message_pieces,
 )
@@ -2166,6 +2168,58 @@ class MemoryInterface(abc.ABC):
         self._insert_entries(
             entries=[ScenarioResultEntry(entry=scenario_result) for scenario_result in scenario_results]
         )
+
+    def add_target_definitions_to_memory(self, *, target_definitions: Sequence[TargetDefinition]) -> None:
+        """
+        Insert or update target definitions in memory.
+
+        Existing rows with the same primary key are updated via ``merge`` semantics.
+
+        Args:
+            target_definitions: Sequence of TargetDefinition objects to persist.
+        """
+        entries = [TargetDefinitionEntry(entry=target_definition) for target_definition in target_definitions]
+        with closing(self.get_session()) as session:
+            try:
+                for entry in entries:
+                    session.merge(entry)
+                session.commit()
+            except SQLAlchemyError as e:
+                session.rollback()
+                logger.exception(f"Error persisting target definitions: {e}")
+                raise
+
+    def get_target_definitions(self, *, include_disabled: bool = False) -> Sequence[TargetDefinition]:
+        """
+        Retrieve persisted target definitions.
+
+        Args:
+            include_disabled: Whether to include disabled definitions. Defaults to False.
+
+        Returns:
+            Sequence[TargetDefinition]: Persisted target definitions ordered by name.
+        """
+        conditions = None if include_disabled else TargetDefinitionEntry.is_enabled == 1
+        entries = self._query_entries(TargetDefinitionEntry, conditions=conditions, order_by=TargetDefinitionEntry.name)
+        return [entry.get_target_definition() for entry in entries]
+
+    def delete_target_definition(self, *, name: str) -> bool:
+        """
+        Delete a target definition by registry name.
+
+        Args:
+            name: Registry name of the definition to delete.
+
+        Returns:
+            bool: True if a row was deleted, False otherwise.
+        """
+        with closing(self.get_session()) as session:
+            entry = session.query(TargetDefinitionEntry).filter_by(name=name).first()
+            if entry is None:
+                return False
+            session.delete(entry)
+            session.commit()
+            return True
 
     def update_scenario_run_state(
         self,

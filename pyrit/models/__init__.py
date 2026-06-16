@@ -90,6 +90,7 @@ from pyrit.models.results.strategy_result import StrategyResult, StrategyResultT
 from pyrit.models.retry_event import RetryEvent
 from pyrit.models.scenario_result import ScenarioIdentifier, ScenarioResult, ScenarioRunState
 from pyrit.models.score import Score, ScoreType, UnvalidatedScore
+from pyrit.models.target_definition import AuthMode, TargetDefinition, TargetType
 
 # Seeds - import from new seeds submodule for forward compatibility
 # Also keep imports from old locations for backward compatibility
@@ -199,6 +200,9 @@ __all__ = [
     "StorageIO",
     "StrategyResult",
     "StrategyResultT",
+    "TargetDefinition",
+    "TargetType",
+    "AuthMode",
     "TARGET_EVAL_PARAM_FALLBACKS",
     "TARGET_EVAL_PARAMS",
     "TargetCapabilities",

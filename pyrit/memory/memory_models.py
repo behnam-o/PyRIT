@@ -54,6 +54,7 @@ from pyrit.models import (
     SeedPrompt,
     SeedSimulatedConversation,
     SeedType,
+    TargetDefinition,
 )
 from pyrit.models.scenario_result import ScenarioRunState
 
@@ -828,6 +829,79 @@ class SeedEntry(Base):
             prompt_group_id=self.prompt_group_id,
             sequence=self.sequence or 0,
             role=self.role,
+        )
+
+
+class TargetDefinitionEntry(Base):
+    """
+    Represents a persisted target definition.
+
+    Stores durable target configuration that can be translated into a live
+    ``PromptTarget`` instance by runtime code.
+    """
+
+    __tablename__ = "TargetDefinitions"
+    __table_args__ = (
+        Index("ix_target_definitions_name", "name", unique=True),
+        {"extend_existing": True},
+    )
+
+    id = mapped_column(CustomUUID, nullable=False, primary_key=True)
+    name = mapped_column(String, nullable=False)
+    target_type = mapped_column(String, nullable=False)
+    endpoint = mapped_column(Unicode, nullable=False)
+    model_name = mapped_column(String, nullable=True)
+    underlying_model = mapped_column(String, nullable=True)
+    temperature = mapped_column(Float, nullable=True)
+    extra_kwargs: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    is_enabled = mapped_column(INTEGER, nullable=False, default=1)
+    is_default_objective_target = mapped_column(INTEGER, nullable=False, default=0)
+    auth_mode = mapped_column(String, nullable=False, default="api_key")
+    api_key_env_var = mapped_column(String, nullable=True)
+
+    def __init__(self, *, entry: TargetDefinition) -> None:
+        """
+        Initialize a TargetDefinitionEntry from a TargetDefinition object.
+
+        Args:
+            entry (TargetDefinition): The target definition to persist.
+        """
+        self.id = entry.id
+        self.name = entry.name
+        self.target_type = entry.target_type
+        self.endpoint = entry.endpoint
+        self.model_name = entry.model_name
+        self.underlying_model = entry.underlying_model
+        self.temperature = entry.temperature
+        self.extra_kwargs = dict(entry.extra_kwargs) if entry.extra_kwargs else None
+        self.tags = list(entry.tags) if entry.tags else None
+        self.is_enabled = 1 if entry.is_enabled else 0
+        self.is_default_objective_target = 1 if entry.is_default_objective_target else 0
+        self.auth_mode = entry.auth_mode
+        self.api_key_env_var = entry.api_key_env_var
+
+    def get_target_definition(self) -> TargetDefinition:
+        """
+        Convert this database entry back into a TargetDefinition.
+
+        Returns:
+            TargetDefinition: The reconstructed target definition.
+        """
+        return TargetDefinition(
+            id=self.id,
+            name=self.name,
+            target_type=self.target_type,
+            endpoint=self.endpoint,
+            model_name=self.model_name,
+            underlying_model=self.underlying_model,
+            temperature=self.temperature,
+            extra_kwargs=dict(self.extra_kwargs) if self.extra_kwargs else {},
+            tags=list(self.tags) if self.tags else [],
+            is_enabled=bool(self.is_enabled),
+            is_default_objective_target=bool(self.is_default_objective_target),
+            auth_mode=self.auth_mode,
+            api_key_env_var=self.api_key_env_var,
         )
 
 

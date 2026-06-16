@@ -2,14 +2,22 @@
 # Licensed under the MIT license.
 
 import os
+import uuid
 from unittest.mock import patch
 
 import pytest
 
+from pyrit.memory import CentralMemory
+from pyrit.models import TargetDefinition, TargetType
 from pyrit.prompt_target import OpenAIChatTarget
 from pyrit.registry import TargetRegistry
 from pyrit.setup.initializers import TargetInitializer
-from pyrit.setup.initializers.components.targets import TARGET_CONFIGS, generate_rr_name, get_behavioral_key
+from pyrit.setup.initializers.components.targets import TARGET_CONFIGS, TARGET_TYPE_TO_CLASS, generate_rr_name, get_behavioral_key
+
+
+def test_target_type_to_class_is_exhaustive():
+    missing = set(TargetType) - set(TARGET_TYPE_TO_CLASS)
+    assert not missing, f"TARGET_TYPE_TO_CLASS is missing entries for: {missing}"
 
 
 class TestTargetInitializerBasic:
@@ -180,6 +188,100 @@ class TestTargetInitializerInitialize:
         assert target is not None
         # The token provider gets wrapped by _ensure_async_token_provider, so just verify it's callable
         assert callable(target._api_key)  # type: ignore[ty:unresolved-attribute]
+
+    async def test_registers_db_backed_target_definition(self) -> None:
+        """DB-backed target definitions should be instantiated and registered alongside built-ins."""
+        memory = CentralMemory.get_memory_instance()
+        memory.add_target_definitions_to_memory(
+            target_definitions=[
+                TargetDefinition(
+                    id=uuid.uuid4(),
+                    name="db_target",
+                    target_type="openai_chat",
+                    endpoint="https://api.openai.com/v1",
+                    model_name="gpt-4o-mini",
+                    auth_mode="api_key",
+                    api_key_env_var="DB_TARGET_KEY",
+                    tags=["default"],
+                )
+            ]
+        )
+        os.environ["DB_TARGET_KEY"] = "db_key"
+
+        try:
+            init = TargetInitializer()
+            await init.initialize_async()
+
+            registry = TargetRegistry.get_registry_singleton()
+            assert "db_target" in registry
+            target = registry.get_instance_by_name("db_target")
+            assert target is not None
+            assert target._model_name == "gpt-4o-mini"
+        finally:
+            os.environ.pop("DB_TARGET_KEY", None)
+
+    async def test_db_backed_target_overrides_builtin_name(self) -> None:
+        """DB-backed target definitions should override built-in targets on name collision."""
+        memory = CentralMemory.get_memory_instance()
+        memory.add_target_definitions_to_memory(
+            target_definitions=[
+                TargetDefinition(
+                    id=uuid.uuid4(),
+                    name="platform_openai_chat",
+                    target_type="openai_chat",
+                    endpoint="https://api.openai.com/v1",
+                    model_name="gpt-4.1-mini",
+                    auth_mode="api_key",
+                    api_key_env_var="DB_OVERRIDE_KEY",
+                    tags=["default"],
+                )
+            ]
+        )
+        os.environ["PLATFORM_OPENAI_CHAT_ENDPOINT"] = "https://api.openai.com/v1"
+        os.environ["PLATFORM_OPENAI_CHAT_KEY"] = "env_key"
+        os.environ["PLATFORM_OPENAI_CHAT_GPT4O_MODEL"] = "gpt-4o"
+        os.environ["DB_OVERRIDE_KEY"] = "db_key"
+
+        try:
+            init = TargetInitializer()
+            await init.initialize_async()
+
+            registry = TargetRegistry.get_registry_singleton()
+            target = registry.get_instance_by_name("platform_openai_chat")
+            assert target is not None
+            assert target._model_name == "gpt-4.1-mini"
+        finally:
+            for env_var in [
+                "PLATFORM_OPENAI_CHAT_ENDPOINT",
+                "PLATFORM_OPENAI_CHAT_KEY",
+                "PLATFORM_OPENAI_CHAT_GPT4O_MODEL",
+                "DB_OVERRIDE_KEY",
+            ]:
+                os.environ.pop(env_var, None)
+
+    async def test_skips_db_target_when_api_key_env_var_missing(self) -> None:
+        """DB-backed target definitions without resolvable auth should be skipped gracefully."""
+        memory = CentralMemory.get_memory_instance()
+        memory.add_target_definitions_to_memory(
+            target_definitions=[
+                TargetDefinition(
+                    id=uuid.uuid4(),
+                    name="db_missing_secret",
+                    target_type="openai_chat",
+                    endpoint="https://api.openai.com/v1",
+                    model_name="gpt-4o-mini",
+                    auth_mode="api_key",
+                    api_key_env_var="MISSING_DB_KEY",
+                    tags=["default"],
+                )
+            ]
+        )
+
+        init = TargetInitializer()
+        await init.initialize_async()
+
+        registry = TargetRegistry.get_registry_singleton()
+        assert "db_missing_secret" not in registry
 
 
 @pytest.mark.usefixtures("patch_central_database")

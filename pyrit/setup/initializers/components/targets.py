@@ -17,10 +17,12 @@ import os
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Callable, assert_never
 
 from pyrit.auth import get_azure_openai_auth, get_azure_token_provider
 from pyrit.common.parameter import Parameter
+from pyrit.memory import CentralMemory
+from pyrit.models import AuthMode, TargetDefinition, TargetType
 from pyrit.models.identifiers import TARGET_EVAL_PARAM_FALLBACKS, TARGET_EVAL_PARAMS
 from pyrit.prompt_target import (
     AzureMLChatTarget,
@@ -39,6 +41,19 @@ from pyrit.registry import TargetRegistry
 from pyrit.setup.initializers.pyrit_initializer import PyRITInitializer
 
 logger = logging.getLogger(__name__)
+
+
+TARGET_TYPE_TO_CLASS: dict[TargetType, type[PromptTarget]] = {
+    TargetType.azure_ml_chat: AzureMLChatTarget,
+    TargetType.openai_chat: OpenAIChatTarget,
+    TargetType.openai_completion: OpenAICompletionTarget,
+    TargetType.openai_image: OpenAIImageTarget,
+    TargetType.openai_response: OpenAIResponseTarget,
+    TargetType.openai_tts: OpenAITTSTarget,
+    TargetType.openai_video: OpenAIVideoTarget,
+    TargetType.prompt_shield: PromptShieldTarget,
+    TargetType.realtime: RealtimeTarget,
+}
 
 
 class TargetInitializerTags(str, Enum):
@@ -603,8 +618,45 @@ class TargetInitializer(PyRITInitializer):
                 continue
             self._register_target(config)
 
+        for definition in self._load_db_target_definitions(tags=tags):
+            self._register_target_definition(definition)
+
         if auto_group:
             self._auto_group_targets()
+
+    def _load_db_target_definitions(self, *, tags: list[str]) -> list[TargetDefinition]:
+        """
+        Load persisted target definitions from central memory.
+
+        DB-backed target loading is additive and optional. If memory is not
+        available or the backing schema has not been upgraded yet, the initializer
+        logs and continues with built-in targets only.
+
+        Args:
+            tags: Tags requested for this initializer run.
+
+        Returns:
+            list[TargetDefinition]: Definitions that match the requested tags.
+        """
+        try:
+            memory = CentralMemory.get_memory_instance()
+        except ValueError:
+            return []
+
+        try:
+            definitions = list(memory.get_target_definitions())
+        except Exception as ex:
+            logger.warning("Skipping DB-backed target definitions: %s", ex)
+            return []
+
+        filtered: list[TargetDefinition] = []
+        for definition in definitions:
+            if not definition.is_enabled:
+                continue
+            if not any(tag in tags for tag in definition.tags):
+                continue
+            filtered.append(definition)
+        return filtered
 
     def _register_target(self, config: TargetConfig) -> None:
         """
@@ -675,14 +727,125 @@ class TargetInitializer(PyRITInitializer):
             kwargs.update(config.extra_kwargs)
 
         target = config.target_class(**kwargs)
+        self._register_instance(
+            target=target,
+            registry_name=config.registry_name,
+            tags=[tag.value for tag in config.tags],
+            default_objective_target=config.default_objective_target,
+        )
+
+    def _register_target_definition(self, definition: TargetDefinition) -> None:
+        """
+        Register a target from a persisted target definition.
+
+        Args:
+            definition: Persisted target definition to instantiate and register.
+        """
+        target_class = TARGET_TYPE_TO_CLASS.get(definition.target_type)
+        if target_class is None:
+            logger.warning(
+                "Skipping target definition '%s': unsupported target_type '%s'",
+                definition.name,
+                definition.target_type,
+            )
+            return
+
+        api_key = self._resolve_db_auth(definition=definition, target_class=target_class)
+        if api_key is None and definition.auth_mode != AuthMode.unauthenticated:
+            logger.warning(
+                "Skipping target definition '%s': missing auth material for auth_mode '%s'",
+                definition.name,
+                definition.auth_mode,
+            )
+            return
+
+        kwargs: dict[str, Any] = {"endpoint": definition.endpoint}
+        if api_key is not None:
+            kwargs["api_key"] = api_key
+        if definition.model_name is not None:
+            kwargs["model_name"] = definition.model_name
+        if definition.underlying_model is not None:
+            kwargs["underlying_model"] = definition.underlying_model
+        if definition.temperature is not None:
+            kwargs["temperature"] = definition.temperature
+        if definition.extra_kwargs:
+            kwargs.update(definition.extra_kwargs)
+
+        target = target_class(**kwargs)
+        self._register_instance(
+            target=target,
+            registry_name=definition.name,
+            tags=list(definition.tags),
+            default_objective_target=definition.is_default_objective_target,
+        )
+
+    def _resolve_db_auth(
+        self,
+        *,
+        definition: TargetDefinition,
+        target_class: type[PromptTarget],
+    ) -> str | Callable[..., Any] | None:
+        """
+        Resolve authentication material for a persisted target definition.
+
+        Args:
+            definition: Persisted target definition.
+            target_class: Target class that will be instantiated.
+
+        Returns:
+            str | Callable[..., Any] | None: API key string, Azure token provider
+            callable, or None when auth is not required or cannot be resolved.
+        """
+        match definition.auth_mode:
+            case AuthMode.unauthenticated:
+                return None
+            case AuthMode.azure_ad:
+                if target_class is PromptShieldTarget:
+                    return get_azure_token_provider("https://cognitiveservices.azure.com/.default")
+                return get_azure_openai_auth(definition.endpoint)
+            case AuthMode.api_key:
+                if not definition.api_key_env_var:
+                    logger.warning(
+                        "Target '%s' has auth_mode='api_key' but no api_key_env_var is set.",
+                        definition.name,
+                    )
+                    return None
+                api_key = os.getenv(definition.api_key_env_var)
+                if not api_key:
+                    logger.warning(
+                        "Target '%s': env var '%s' is not set or empty.",
+                        definition.name,
+                        definition.api_key_env_var,
+                    )
+                return api_key
+            case _ as unreachable:
+                assert_never(unreachable)
+
+    def _register_instance(
+        self,
+        *,
+        target: PromptTarget,
+        registry_name: str,
+        tags: list[str],
+        default_objective_target: bool,
+    ) -> None:
+        """
+        Register an instantiated target into the registry.
+
+        Args:
+            target: Instantiated target.
+            registry_name: Registry name.
+            tags: Tags to apply.
+            default_objective_target: Whether to apply the default-objective tag.
+        """
         registry = TargetRegistry.get_registry_singleton()
-        registry.register_instance(target, name=config.registry_name)
-        if config.tags:
-            registry.add_tags(name=config.registry_name, tags=list(config.tags))
-        if config.default_objective_target:
-            registry.add_tags(name=config.registry_name, tags=[TargetInitializerTags.DEFAULT_OBJECTIVE_TARGET])
-        self._registered_names.append(config.registry_name)
-        logger.info(f"Registered target: {config.registry_name}")
+        registry.register_instance(target, name=registry_name)
+        if tags:
+            registry.add_tags(name=registry_name, tags=tags)
+        if default_objective_target:
+            registry.add_tags(name=registry_name, tags=[TargetInitializerTags.DEFAULT_OBJECTIVE_TARGET.value])
+        self._registered_names.append(registry_name)
+        logger.info(f"Registered target: {registry_name}")
 
     def _auto_group_targets(self) -> None:
         """

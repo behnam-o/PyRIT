@@ -37,6 +37,7 @@ def sqlite_instance() -> Generator[SQLiteMemory, None, None]:
     assert "EmbeddingData" in inspector.get_table_names(), "EmbeddingData table not created."
     assert "ScoreEntries" in inspector.get_table_names(), "ScoreEntries table not created."
     assert "SeedPromptEntries" in inspector.get_table_names(), "SeedPromptEntries table not created."
+    assert "TargetDefinitions" in inspector.get_table_names(), "TargetDefinitions table not created."
 
     CentralMemory.set_memory_instance(sqlite_memory)
     yield sqlite_memory
