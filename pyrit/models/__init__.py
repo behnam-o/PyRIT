@@ -88,6 +88,11 @@ from pyrit.models.question_answering import QuestionAnsweringDataset, QuestionAn
 from pyrit.models.results.attack_result import AttackOutcome, AttackResult, AttackResultT
 from pyrit.models.results.strategy_result import StrategyResult, StrategyResultT
 from pyrit.models.retry_event import RetryEvent
+from pyrit.models.prompt_sending_attack_definition import (
+    Base64ConverterDefinition,
+    Base64EncodingFunction,
+    PromptSendingAttackDefinition,
+)
 from pyrit.models.scenario_result import ScenarioIdentifier, ScenarioResult, ScenarioRunState
 from pyrit.models.score import Score, ScoreType, UnvalidatedScore
 from pyrit.models.target_definition import AuthMode, TargetDefinition, TargetType
@@ -121,6 +126,8 @@ __all__ = [
     "AttackOutcome",
     "AudioPathDataTypeSerializer",
     "AzureBlobStorageIO",
+    "Base64ConverterDefinition",
+    "Base64EncodingFunction",
     "BinaryPathDataTypeSerializer",
     "ChatMessage",
     "ChatMessagesDataset",
@@ -170,6 +177,7 @@ __all__ = [
     "NextMessageSystemPromptPaths",
     "ObjectiveTargetEvaluationIdentifier",
     "PromptDataType",
+    "PromptSendingAttackDefinition",
     "PromptResponseError",
     "QuestionAnsweringDataset",
     "QuestionAnsweringEntry",

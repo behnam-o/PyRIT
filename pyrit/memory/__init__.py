@@ -13,8 +13,17 @@ from pyrit.memory.memory_embedding import MemoryEmbedding
 from pyrit.memory.memory_interface import MemoryInterface
 from pyrit.memory.memory_models import (
     AttackResultEntry,
+<<<<<<< Updated upstream
     EmbeddingDataEntry,
     PromptMemoryEntry,
+=======
+    Base64ConverterDefinitionEntry,
+    EmbeddingDataEntry,
+    PromptMemoryEntry,
+    PromptSendingAttackConverterDefinitionRefEntry,
+    PromptSendingAttackDefinitionEntry,
+    PromptSendingAttackTargetDefinitionRefEntry,
+>>>>>>> Stashed changes
     SeedEntry,
     TargetDefinitionEntry,
 )
@@ -44,6 +53,7 @@ __all__ = [
     "AudioPathDataTypeSerializer",
     "AzureBlobStorageIO",
     "AzureSQLMemory",
+    "Base64ConverterDefinitionEntry",
     "BinaryPathDataTypeSerializer",
     "CentralMemory",
     "DataTypeSerializer",
@@ -55,6 +65,9 @@ __all__ = [
     "MemoryInterface",
     "MemoryEmbedding",
     "PromptMemoryEntry",
+    "PromptSendingAttackConverterDefinitionRefEntry",
+    "PromptSendingAttackDefinitionEntry",
+    "PromptSendingAttackTargetDefinitionRefEntry",
     "SeedEntry",
     "set_message_piece_sha256_async",
     "set_seed_sha256_async",

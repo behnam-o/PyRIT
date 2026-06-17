@@ -23,10 +23,14 @@ if TYPE_CHECKING:
 from pyrit.common.deprecation import print_deprecation_message
 from pyrit.memory.memory_models import (
     AttackResultEntry,
+    Base64ConverterDefinitionEntry,
     Base,
     ConversationEntry,
     EmbeddingDataEntry,
     PromptMemoryEntry,
+    PromptSendingAttackConverterDefinitionRefEntry,
+    PromptSendingAttackDefinitionEntry,
+    PromptSendingAttackTargetDefinitionRefEntry,
     ScenarioResultEntry,
     ScoreEntry,
     SeedEntry,
@@ -40,12 +44,14 @@ from pyrit.memory.storage import (
 )
 from pyrit.models import (
     AttackResult,
+    Base64ConverterDefinition,
     Conversation,
     ConversationStats,
     IdentifierFilter,
     IdentifierType,
     Message,
     MessagePiece,
+    PromptSendingAttackDefinition,
     ScenarioResult,
     Score,
     Seed,
@@ -2189,6 +2195,151 @@ class MemoryInterface(abc.ABC):
                 logger.exception(f"Error persisting target definitions: {e}")
                 raise
 
+<<<<<<< Updated upstream
+=======
+    def add_base64_converter_definitions_to_memory(
+        self,
+        *,
+        converter_definitions: Sequence[Base64ConverterDefinition],
+    ) -> None:
+        """
+        Insert or update Base64 converter definitions in memory.
+
+        Existing rows with the same primary key are updated via ``merge`` semantics.
+
+        Args:
+            converter_definitions: Sequence of Base64 converter definitions to persist.
+        """
+        entries = [Base64ConverterDefinitionEntry(entry=definition) for definition in converter_definitions]
+        with closing(self.get_session()) as session:
+            try:
+                for entry in entries:
+                    session.merge(entry)
+                session.commit()
+            except SQLAlchemyError as e:
+                session.rollback()
+                logger.exception(f"Error persisting converter definitions: {e}")
+                raise
+
+    def add_prompt_sending_attack_definitions_to_memory(
+        self,
+        *,
+        attack_definitions: Sequence[PromptSendingAttackDefinition],
+    ) -> None:
+        """
+        Insert or update prompt-sending attack definitions in memory.
+
+        Target and converter definitions are persisted first, then Id-based association
+        rows are refreshed so references stay consistent.
+
+        Args:
+            attack_definitions: Sequence of PromptSendingAttackDefinition objects to persist.
+        """
+        with closing(self.get_session()) as session:
+            try:
+                for definition in attack_definitions:
+                    session.merge(TargetDefinitionEntry(entry=definition.target_definition))
+
+                    for converter_definition in definition.converter_definitions:
+                        session.merge(Base64ConverterDefinitionEntry(entry=converter_definition))
+
+                    session.merge(PromptSendingAttackDefinitionEntry(entry=definition))
+
+                    session.query(PromptSendingAttackTargetDefinitionRefEntry).filter_by(
+                        prompt_sending_attack_definition_id=definition.id
+                    ).delete()
+                    session.query(PromptSendingAttackConverterDefinitionRefEntry).filter_by(
+                        prompt_sending_attack_definition_id=definition.id
+                    ).delete()
+
+                    session.add(
+                        PromptSendingAttackTargetDefinitionRefEntry(
+                            prompt_sending_attack_definition_id=definition.id,
+                            target_definition_id=definition.target_definition.id,
+                        )
+                    )
+                    for position, converter_definition in enumerate(definition.converter_definitions):
+                        session.add(
+                            PromptSendingAttackConverterDefinitionRefEntry(
+                                prompt_sending_attack_definition_id=definition.id,
+                                converter_definition_id=converter_definition.id,
+                                position=position,
+                            )
+                        )
+
+                session.commit()
+            except SQLAlchemyError as e:
+                session.rollback()
+                logger.exception(f"Error persisting prompt-sending attack definitions: {e}")
+                raise
+
+    def get_base64_converter_definitions(self) -> Sequence[Base64ConverterDefinition]:
+        """
+        Retrieve persisted Base64 converter definitions.
+
+        Returns:
+            Sequence[Base64ConverterDefinition]: Persisted converter definitions ordered by id.
+        """
+        entries = self._query_entries(Base64ConverterDefinitionEntry, order_by=Base64ConverterDefinitionEntry.id)
+        return [entry.get_base64_converter_definition() for entry in entries]
+
+    def get_prompt_sending_attack_definitions(self) -> Sequence[PromptSendingAttackDefinition]:
+        """
+        Retrieve persisted prompt-sending attack definitions.
+
+        Returns:
+            Sequence[PromptSendingAttackDefinition]: Persisted attack definitions ordered by id.
+        """
+        with closing(self.get_session()) as session:
+            entries = session.query(PromptSendingAttackDefinitionEntry).order_by(PromptSendingAttackDefinitionEntry.id).all()
+
+            definitions: list[PromptSendingAttackDefinition] = []
+            for entry in entries:
+                target_ref = (
+                    session.query(PromptSendingAttackTargetDefinitionRefEntry)
+                    .filter_by(prompt_sending_attack_definition_id=entry.id)
+                    .first()
+                )
+                if target_ref is None:
+                    continue
+
+                target_entry = session.query(TargetDefinitionEntry).filter_by(id=target_ref.target_definition_id).first()
+                if target_entry is None:
+                    continue
+
+                converter_refs = (
+                    session.query(PromptSendingAttackConverterDefinitionRefEntry)
+                    .filter_by(prompt_sending_attack_definition_id=entry.id)
+                    .order_by(PromptSendingAttackConverterDefinitionRefEntry.position)
+                    .all()
+                )
+                converter_ids = [ref.converter_definition_id for ref in converter_refs]
+
+                converter_entries = (
+                    session.query(Base64ConverterDefinitionEntry)
+                    .filter(Base64ConverterDefinitionEntry.id.in_(converter_ids))
+                    .all()
+                    if converter_ids
+                    else []
+                )
+                converter_entry_map = {converter_entry.id: converter_entry for converter_entry in converter_entries}
+                converter_definitions = [
+                    converter_entry_map[converter_id].get_base64_converter_definition()
+                    for converter_id in converter_ids
+                    if converter_id in converter_entry_map
+                ]
+
+                definitions.append(
+                    PromptSendingAttackDefinition(
+                        id=entry.id,
+                        target_definition=target_entry.get_target_definition(),
+                        converter_definitions=converter_definitions,
+                    )
+                )
+
+            return definitions
+
+>>>>>>> Stashed changes
     def get_target_definitions(self, *, include_disabled: bool = False) -> Sequence[TargetDefinition]:
         """
         Retrieve persisted target definitions.
@@ -2221,6 +2372,52 @@ class MemoryInterface(abc.ABC):
             session.commit()
             return True
 
+<<<<<<< Updated upstream
+=======
+    def delete_base64_converter_definition(self, *, definition_id: uuid.UUID) -> bool:
+        """
+        Delete a Base64 converter definition by id.
+
+        Args:
+            definition_id: Id of the definition to delete.
+
+        Returns:
+            bool: True if a row was deleted, False otherwise.
+        """
+        with closing(self.get_session()) as session:
+            entry = session.query(Base64ConverterDefinitionEntry).filter_by(id=definition_id).first()
+            if entry is None:
+                return False
+            session.delete(entry)
+            session.commit()
+            return True
+
+    def delete_prompt_sending_attack_definition(self, *, definition_id: uuid.UUID) -> bool:
+        """
+        Delete a prompt-sending attack definition by id.
+
+        Args:
+            definition_id: Id of the definition to delete.
+
+        Returns:
+            bool: True if a row was deleted, False otherwise.
+        """
+        with closing(self.get_session()) as session:
+            entry = session.query(PromptSendingAttackDefinitionEntry).filter_by(id=definition_id).first()
+            if entry is None:
+                return False
+
+            session.query(PromptSendingAttackTargetDefinitionRefEntry).filter_by(
+                prompt_sending_attack_definition_id=definition_id
+            ).delete()
+            session.query(PromptSendingAttackConverterDefinitionRefEntry).filter_by(
+                prompt_sending_attack_definition_id=definition_id
+            ).delete()
+            session.delete(entry)
+            session.commit()
+            return True
+
+>>>>>>> Stashed changes
     def update_scenario_run_state(
         self,
         *,

@@ -33,6 +33,9 @@ from sqlalchemy.types import Uuid
 import pyrit
 from pyrit.common.utils import to_sha256
 from pyrit.models import (
+    Base64ConverterDefinition,
+    Base64EncodingFunction,
+    PromptSendingAttackDefinition,
     SEED_RESPONSE_JSON_SCHEMA_METADATA_KEY,
     AtomicAttackEvaluationIdentifier,
     AttackOutcome,
@@ -905,6 +908,107 @@ class TargetDefinitionEntry(Base):
         )
 
 
+<<<<<<< Updated upstream
+=======
+class Base64ConverterDefinitionEntry(Base):
+    """Represents a persisted Base64 converter definition."""
+
+    __tablename__ = "Base64ConverterDefinitions"
+    __table_args__ = {"extend_existing": True}
+
+    id = mapped_column(CustomUUID, nullable=False, primary_key=True)
+    encoding_func = mapped_column(String, nullable=False)
+
+    def __init__(self, *, entry: Base64ConverterDefinition) -> None:
+        """
+        Initialize a Base64ConverterDefinitionEntry from a Base64ConverterDefinition object.
+
+        Args:
+            entry (Base64ConverterDefinition): The converter definition to persist.
+        """
+        self.id = entry.id
+        self.encoding_func = entry.encoding_func
+
+    def get_base64_converter_definition(self) -> Base64ConverterDefinition:
+        """
+        Convert this database entry back into a Base64ConverterDefinition.
+
+        Returns:
+            Base64ConverterDefinition: The reconstructed converter definition.
+        """
+        return Base64ConverterDefinition(
+            id=self.id,
+            encoding_func=Base64EncodingFunction(self.encoding_func),
+        )
+
+
+class PromptSendingAttackDefinitionEntry(Base):
+    """Represents a persisted prompt-sending attack definition."""
+
+    __tablename__ = "PromptSendingAttackDefinitions"
+    __table_args__ = {"extend_existing": True}
+
+    id = mapped_column(CustomUUID, nullable=False, primary_key=True)
+
+    def __init__(self, *, entry: PromptSendingAttackDefinition) -> None:
+        """
+        Initialize a PromptSendingAttackDefinitionEntry from a PromptSendingAttackDefinition object.
+
+        Args:
+            entry (PromptSendingAttackDefinition): The attack definition to persist.
+        """
+        self.id = entry.id
+
+
+class PromptSendingAttackTargetDefinitionRefEntry(Base):
+    """Association between prompt-sending attack definitions and target definitions."""
+
+    __tablename__ = "PromptSendingAttackTargetDefinitionRefs"
+    __table_args__ = ({"extend_existing": True},)
+
+    prompt_sending_attack_definition_id = mapped_column(
+        CustomUUID,
+        ForeignKey(f"{PromptSendingAttackDefinitionEntry.__tablename__}.id"),
+        nullable=False,
+        primary_key=True,
+    )
+    target_definition_id = mapped_column(
+        CustomUUID,
+        ForeignKey(f"{TargetDefinitionEntry.__tablename__}.id"),
+        nullable=False,
+    )
+
+
+class PromptSendingAttackConverterDefinitionRefEntry(Base):
+    """Association between prompt-sending attack definitions and converter definitions."""
+
+    __tablename__ = "PromptSendingAttackConverterDefinitionRefs"
+    __table_args__ = (
+        Index(
+            "ix_prompt_sending_attack_converter_ref_attack_id_position",
+            "prompt_sending_attack_definition_id",
+            "position",
+            unique=True,
+        ),
+        {"extend_existing": True},
+    )
+
+    prompt_sending_attack_definition_id = mapped_column(
+        CustomUUID,
+        ForeignKey(f"{PromptSendingAttackDefinitionEntry.__tablename__}.id"),
+        nullable=False,
+        primary_key=True,
+    )
+    converter_definition_id = mapped_column(
+        CustomUUID,
+        ForeignKey(f"{Base64ConverterDefinitionEntry.__tablename__}.id"),
+        nullable=False,
+        primary_key=True,
+    )
+    position = mapped_column(INTEGER, nullable=False, default=0)
+
+
+>>>>>>> Stashed changes
 class AttackResultEntry(Base):
     """
     Represents the attack result data in the database.
