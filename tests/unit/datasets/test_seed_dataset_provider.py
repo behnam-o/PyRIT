@@ -13,6 +13,7 @@ import yaml
 
 import pyrit.datasets.seed_datasets.remote  # noqa: F401  triggers loader registration
 from pyrit.datasets import SeedDatasetProvider
+from pyrit.datasets.seed_datasets.dataset_parameter import DatasetParameter
 from pyrit.datasets.seed_datasets.local.local_dataset_loader import _LocalDatasetLoader
 from pyrit.datasets.seed_datasets.remote.darkbench_dataset import _DarkBenchDataset
 from pyrit.datasets.seed_datasets.remote.harmbench_dataset import _HarmBenchDataset
@@ -152,6 +153,45 @@ class TestSeedDatasetProvider:
             # Test with mix of valid and invalid names
             with pytest.raises(ValueError, match=r"Dataset\(s\) not found: \['invalid1', 'invalid2'\]"):
                 await SeedDatasetProvider.fetch_datasets_async(dataset_names=["d1", "invalid1", "invalid2"])
+
+    def test_get_dataset_parameters_surfaces_marked_args(self):
+        """Only ``DatasetParameter``-marked constructor args are surfaced."""
+        params = SeedDatasetProvider.get_dataset_parameters(class_name="_HarmBenchDataset")
+
+        # ``source`` / ``source_type`` are unmarked plumbing and must be excluded.
+        assert [p.name for p in params] == ["category"]
+        assert params[0].param_type is str
+        assert params[0].default is None
+
+    def test_get_dataset_parameters_unknown_class_returns_empty(self):
+        """An unknown class name yields an empty parameter list."""
+        assert SeedDatasetProvider.get_dataset_parameters(class_name="_DoesNotExist") == []
+
+    async def test_fetch_datasets_async_with_parameters(self):
+        """``dataset_parameters`` are coerced and forwarded to provider construction."""
+        captured: dict[str, object] = {}
+
+        class _ParamProvider(SeedDatasetProvider):
+            should_register = False
+
+            def __init__(self, *, category: typing.Annotated[str | None, DatasetParameter()] = None) -> None:
+                self.category = category
+
+            @property
+            def dataset_name(self) -> str:
+                return "param_ds"
+
+            async def fetch_dataset_async(self, *, cache: bool = True) -> SeedDataset:
+                captured["category"] = self.category
+                return SeedDataset(seeds=[SeedPrompt(value="p", data_type="text")], dataset_name="param_ds")
+
+        with patch.dict(SeedDatasetProvider._registry, {"_ParamProvider": _ParamProvider}, clear=True):
+            datasets = await SeedDatasetProvider.fetch_datasets_async(
+                dataset_parameters={"param_ds": {"category": "illegal"}}
+            )
+
+        assert captured["category"] == "illegal"
+        assert len(datasets) == 1
 
 
 class TestFetchDatasetDeprecation:

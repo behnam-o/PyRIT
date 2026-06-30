@@ -219,6 +219,18 @@ def print_dataset_list(*, items: list[dict[str, Any]]) -> None:
         status = "loaded" if loaded else "not loaded"
         marker = "*" if loaded else " "
         print(f"  {marker} {name} ({status})")
+        params = ds.get("parameters") or []
+        if params:
+            print("    Parameters:")
+            for p in params:
+                required_str = " [required]" if p.get("required") else ""
+                default_str = "" if p.get("required") else f" [default: {p.get('default')!r}]"
+                choices = p.get("choices")
+                choices_display = ", ".join(str(c) for c in choices) if isinstance(choices, list) else choices
+                choices_str = f" [choices: {choices_display}]" if choices_display else ""
+                description = p.get("description") or ""
+                desc_str = f": {description}" if description else ""
+                print(f"      - {p.get('name', '?')}{required_str}{default_str}{choices_str}{desc_str}")
     print("=" * 80)
     loaded_count = sum(1 for ds in items if ds.get("loaded"))
     print(f"\nTotal datasets: {len(items)} ({loaded_count} loaded)")

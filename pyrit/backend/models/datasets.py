@@ -9,7 +9,19 @@ Datasets are seed prompt/objective collections provided by
 listing available datasets and loading them into memory.
 """
 
+from typing import Any
+
 from pydantic import BaseModel, Field
+
+
+class DatasetParameterInfo(BaseModel):
+    """A single user-settable parameter exposed by a dataset loader."""
+
+    name: str = Field(..., description="Parameter name (the loader constructor argument)")
+    description: str = Field("", description="Human-readable description of the parameter")
+    required: bool = Field(False, description="Whether the parameter must be supplied")
+    default: Any | None = Field(None, description="Default value used when the parameter is omitted")
+    choices: list[Any] | None = Field(None, description="Allowed values for a constrained parameter, if any")
 
 
 class DatasetInfo(BaseModel):
@@ -17,6 +29,9 @@ class DatasetInfo(BaseModel):
 
     name: str = Field(..., description="Dataset name (e.g., 'harmbench')")
     loaded: bool = Field(False, description="Whether the dataset is already present in memory")
+    parameters: list[DatasetParameterInfo] = Field(
+        default_factory=list, description="User-settable parameters this dataset exposes"
+    )
 
 
 class DatasetListResponse(BaseModel):
@@ -29,6 +44,10 @@ class LoadDatasetRequest(BaseModel):
     """Request to load one or more datasets into memory."""
 
     dataset_names: list[str] = Field(..., description="Names of the datasets to load into memory")
+    dataset_parameters: dict[str, dict[str, Any]] | None = Field(
+        None,
+        description="Optional mapping of dataset name to constructor argument values",
+    )
     cache: bool = Field(True, description="Whether to cache fetched remote datasets to disk")
 
 

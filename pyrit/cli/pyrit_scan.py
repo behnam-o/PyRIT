@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any, get_args, get_origin
 from pyrit.cli._cli_args import (
     ARG_HELP,
     _parse_initializer_arg,
+    _parse_load_dataset_arg,
     build_parameters_from_api,
     non_negative_int,
     positive_int,
@@ -196,10 +197,10 @@ def _build_base_parser(*, add_help: bool = True) -> ArgumentParser:
     )
     discovery_group.add_argument(
         "--load-dataset",
-        type=str,
+        type=_parse_load_dataset_arg,
         nargs="+",
-        metavar="NAME",
-        help="Load one or more datasets into memory and exit",
+        metavar="NAME[:key=val]",
+        help=ARG_HELP["load_dataset"],
     )
     discovery_group.add_argument(
         "--add-initializer",
@@ -543,10 +544,24 @@ async def _handle_load_dataset_async(*, client: Any, parsed_args: Namespace) -> 
     Returns:
         int: Exit code (``0`` on success, ``1`` on failure).
     """
-    print(f"\nLoading datasets: {', '.join(parsed_args.load_dataset)} (this can take a few minutes)...")
+    dataset_names: list[str] = []
+    dataset_parameters: dict[str, dict[str, Any]] = {}
+    for entry in parsed_args.load_dataset:
+        if isinstance(entry, dict):
+            name = entry["name"]
+            dataset_names.append(name)
+            if entry.get("args"):
+                dataset_parameters[name] = entry["args"]
+        else:
+            dataset_names.append(entry)
+
+    print(f"\nLoading datasets: {', '.join(dataset_names)} (this can take a few minutes)...")
     sys.stdout.flush()
     try:
-        result = await client.load_datasets_async(dataset_names=parsed_args.load_dataset)
+        result = await client.load_datasets_async(
+            dataset_names=dataset_names,
+            dataset_parameters=dataset_parameters or None,
+        )
     except Exception as exc:
         print(f"Error loading datasets: {exc}")
         return 1

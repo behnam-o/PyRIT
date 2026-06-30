@@ -184,7 +184,13 @@ class PyRITApiClient:
         """
         return await self._get_json_async(path="/api/datasets")
 
-    async def load_datasets_async(self, *, dataset_names: list[str], cache: bool = True) -> dict[str, Any]:
+    async def load_datasets_async(
+        self,
+        *,
+        dataset_names: list[str],
+        dataset_parameters: dict[str, dict[str, Any]] | None = None,
+        cache: bool = True,
+    ) -> dict[str, Any]:
         """
         Load one or more datasets into memory.
 
@@ -194,6 +200,8 @@ class PyRITApiClient:
 
         Args:
             dataset_names: Names of the datasets to load.
+            dataset_parameters: Optional mapping of dataset name to constructor
+                argument values. Datasets absent from the mapping use their defaults.
             cache: Whether to cache fetched remote datasets to disk.
 
         Returns:
@@ -201,10 +209,14 @@ class PyRITApiClient:
         """
         import httpx
 
+        payload: dict[str, Any] = {"dataset_names": dataset_names, "cache": cache}
+        if dataset_parameters:
+            payload["dataset_parameters"] = dataset_parameters
+
         client = self._get_client()
         resp = await client.post(
             "/api/datasets/load",
-            json={"dataset_names": dataset_names, "cache": cache},
+            json=payload,
             timeout=httpx.Timeout(connect=10.0, read=None, write=30.0, pool=10.0),
         )
         self._raise_for_status(resp)

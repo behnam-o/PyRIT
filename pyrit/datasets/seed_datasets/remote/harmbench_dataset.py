@@ -1,10 +1,11 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from typing_extensions import override
 
+from pyrit.datasets.seed_datasets.dataset_parameter import DatasetParameter
 from pyrit.datasets.seed_datasets.remote.remote_dataset_loader import (
     _RemoteDatasetLoader,
 )
@@ -35,6 +36,7 @@ class _HarmBenchDataset(_RemoteDatasetLoader):
             "harmbench_behaviors_text_all.csv"
         ),
         source_type: Literal["public_url", "file"] = "public_url",
+        category: Annotated[str | None, DatasetParameter()] = None,
     ) -> None:
         """
         Initialize the HarmBench dataset loader.
@@ -42,9 +44,12 @@ class _HarmBenchDataset(_RemoteDatasetLoader):
         Args:
             source: URL to the HarmBench CSV file. Defaults to the official repository.
             source_type: The type of source ('public_url' or 'file').
+            category (str | None): Optional SemanticCategory to filter behaviors by.
+                Defaults to None, which keeps all categories.
         """
         self.source = source
         self.source_type: Literal["public_url", "file"] = source_type
+        self.category = category
 
     @property
     @override
@@ -87,6 +92,10 @@ class _HarmBenchDataset(_RemoteDatasetLoader):
             # Extract data
             category = example["SemanticCategory"]
 
+            # Apply optional category filter
+            if self.category is not None and category != self.category:
+                continue
+
             # Create SeedPrompt
             seed_prompt = SeedObjective(
                 value=example["Behavior"],
@@ -108,6 +117,9 @@ class _HarmBenchDataset(_RemoteDatasetLoader):
                 ],
             )
             seeds.append(seed_prompt)
+
+        if not seeds:
+            raise ValueError("SeedDataset cannot be empty. Check your filter criteria.")
 
         # Create and return SeedDataset
         return SeedDataset(seeds=seeds, dataset_name=self.dataset_name)

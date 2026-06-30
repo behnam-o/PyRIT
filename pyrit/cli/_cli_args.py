@@ -275,6 +275,12 @@ ARG_HELP = {
     "target": "Name of a registered target from the TargetRegistry to use as the objective target. "
     "Targets are registered by initializers (e.g., 'target' initializer). "
     "Use --list-targets to see available target names after initializers have run",
+    "load_dataset": (
+        "Names of datasets to load into memory and exit. "
+        "Supports optional params with name:key=val syntax "
+        "(e.g., harmbench:category=chemical_biological). "
+        "Use comma-separated values for list parameters (e.g., name:key=a,b)"
+    ),
 }
 
 
@@ -322,6 +328,59 @@ def _parse_initializer_arg(arg: str) -> str | dict[str, Any]:
         if not key:
             raise ValueError(f"Invalid initializer parameter in '{arg}': empty key")
         args[key] = [v.strip() for v in value.split(",")]
+
+    if args:
+        return {"name": name, "args": args}
+    return name
+
+
+def _parse_load_dataset_arg(arg: str) -> str | dict[str, Any]:
+    """
+    Parse a ``--load-dataset`` CLI argument into a string or dict.
+
+    Supports two formats:
+    - Simple name: "harmbench" → "harmbench"
+    - Name with params: "harmbench:category=chemical_biological" →
+      {"name": "harmbench", "args": {"category": "chemical_biological"}}
+
+    Values are kept as strings so the server can coerce them to each loader's
+    declared parameter type. A comma-separated value becomes a list, for
+    parameters that declare a list type (e.g., "name:key=a,b" → {"key": ["a", "b"]}).
+
+    For multiple params on one dataset, separate with semicolons: "name:key1=val1;key2=val2"
+    For multiple datasets with params, space-separate them: "airt_hate harmbench:category=chemical_biological"
+
+    Args:
+        arg: The CLI argument string.
+
+    Returns:
+        str | dict[str, Any]: A plain name string, or a dict with 'name' and 'args' keys.
+
+    Raises:
+        ValueError: If the argument format is invalid.
+    """
+    if ":" not in arg:
+        return arg
+
+    name, params_str = arg.split(":", 1)
+    if not name:
+        raise ValueError(f"Invalid dataset argument '{arg}': missing name before ':'")
+
+    args: dict[str, Any] = {}
+    for pair in params_str.split(";"):
+        pair = pair.strip()
+        if not pair:
+            continue
+        if "=" not in pair:
+            raise ValueError(f"Invalid dataset parameter '{pair}' in '{arg}': expected key=value format")
+        key, value = pair.split("=", 1)
+        key = key.strip()
+        if not key:
+            raise ValueError(f"Invalid dataset parameter in '{arg}': empty key")
+        if "," in value:
+            args[key] = [v.strip() for v in value.split(",")]
+        else:
+            args[key] = value.strip()
 
     if args:
         return {"name": name, "args": args}

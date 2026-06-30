@@ -32,7 +32,7 @@ import inspect
 import re
 import types
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeAlias, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, TypeAlias, Union, get_args, get_origin
 
 from pyrit.common.apply_defaults import REQUIRED_VALUE, _RequiredValueSentinel
 from pyrit.models.parameter import ComponentType, Parameter, RegistryReference
@@ -148,6 +148,10 @@ def derive_parameters(*, cls: type, identifier_type: type[ComponentIdentifier] |
             continue
 
         annotation = param.annotation
+        # Strip any ``Annotated[X, ...]`` marker (e.g. ``DatasetParameter``) so the
+        # contract carries the bare type ``X``.
+        if get_origin(annotation) is Annotated:
+            annotation = get_args(annotation)[0]
         component_type = reference_overrides.get(name)
         description = descriptions.get(name, "")
         default = _default_for(param)

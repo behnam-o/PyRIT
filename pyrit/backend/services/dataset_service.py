@@ -15,12 +15,16 @@ from functools import lru_cache
 from pyrit.backend.models.datasets import (
     DatasetInfo,
     DatasetListResponse,
+    DatasetParameterInfo,
     LoadDatasetRequest,
     LoadDatasetResponse,
     LoadedDataset,
 )
+from pyrit.common.apply_defaults import REQUIRED_VALUE
 from pyrit.datasets import SeedDatasetProvider
 from pyrit.memory import CentralMemory
+from pyrit.models.parameter import Parameter
+from pyrit.registry.resolution import display_choices
 
 logger = logging.getLogger(__name__)
 
@@ -35,15 +39,46 @@ class DatasetService:
         List all available datasets and whether they are already in memory.
 
         Returns:
-            DatasetListResponse: Available datasets with their loaded status.
+            DatasetListResponse: Available datasets with their loaded status and parameters.
         """
-        available = await SeedDatasetProvider.get_all_dataset_names_async()
-
         memory = CentralMemory.get_memory_instance()
         loaded = set(memory.get_seed_dataset_names())
 
-        items = [DatasetInfo(name=name, loaded=name in loaded) for name in available]
+        items: list[DatasetInfo] = []
+        for class_name, provider_class in SeedDatasetProvider.get_all_providers().items():
+            name = provider_class().dataset_name
+            parameters = SeedDatasetProvider.get_dataset_parameters(class_name=class_name)
+            items.append(
+                DatasetInfo(
+                    name=name,
+                    loaded=name in loaded,
+                    parameters=[self._to_parameter_info(param=param) for param in parameters],
+                )
+            )
+
+        items.sort(key=lambda item: item.name)
         return DatasetListResponse(items=items)
+
+    @staticmethod
+    def _to_parameter_info(*, param: Parameter) -> DatasetParameterInfo:
+        """
+        Project a derived ``Parameter`` into its serializable API model.
+
+        Args:
+            param (Parameter): The introspected loader parameter.
+
+        Returns:
+            DatasetParameterInfo: The wire representation of the parameter.
+        """
+        required = param.default is REQUIRED_VALUE
+        choices = display_choices(param.param_type)
+        return DatasetParameterInfo(
+            name=param.name,
+            description=param.description,
+            required=required,
+            default=None if required else param.default,
+            choices=list(choices) if choices is not None else None,
+        )
 
     async def load_datasets_async(self, *, request: LoadDatasetRequest) -> LoadDatasetResponse:
         """
@@ -60,6 +95,7 @@ class DatasetService:
         """
         datasets = await SeedDatasetProvider.fetch_datasets_async(
             dataset_names=request.dataset_names,
+            dataset_parameters=request.dataset_parameters,
             cache=request.cache,
         )
 

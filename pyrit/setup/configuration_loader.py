@@ -73,6 +73,20 @@ class ScenarioConfig:
     args: dict[str, YamlValue] | None = None
 
 
+@dataclass
+class DatasetConfig:
+    """
+    Configuration for a single seed dataset to load into memory.
+
+    Attributes:
+        name: The dataset name (must match a registered ``SeedDatasetProvider``).
+        args: Optional map of constructor argument values for the dataset loader.
+    """
+
+    name: str
+    args: dict[str, YamlValue] | None = None
+
+
 def _scenario_config_to_dict(config: ScenarioConfig) -> dict[str, Any]:
     """
     Serialize a ``ScenarioConfig`` back to the YAML-style dict shape.
@@ -103,7 +117,9 @@ class ConfigurationLoader(YamlLoadable):
             None means "use defaults", [] means "load nothing".
         env_files: List of environment file paths to load.
             None means "use defaults (.env, .env.local)", [] means "load nothing".
-        datasets: List of seed dataset names to load into memory after initialization.
+        datasets: List of seed datasets to load into memory after initialization.
+            Each entry is a dataset name or a ``{"name": ..., "args": {...}}`` dict
+            whose args are passed to the dataset loader constructor.
         silent: Whether to suppress initialization messages.
         operator: Name for the current operator, e.g. a team or username.
         operation: Name for the current operation.
@@ -127,6 +143,9 @@ class ConfigurationLoader(YamlLoadable):
         datasets:
           - airt_illegal
           - airt_malware
+          - name: harmbench
+            args:
+              category: chemical_biological
 
         silent: false
 
@@ -146,7 +165,7 @@ class ConfigurationLoader(YamlLoadable):
     initialization_scripts: list[str] | None = None
     env_files: list[str] | None = None
     env_akv_ref: list[str] | None = None
-    datasets: list[str] = field(default_factory=list)
+    datasets: list[str | dict[str, Any]] = field(default_factory=list)
     silent: bool = False
     operator: str | None = None
     operation: str | None = None
@@ -160,6 +179,7 @@ class ConfigurationLoader(YamlLoadable):
         """Validate and normalize the configuration after loading."""
         self._normalize_memory_db_type()
         self._normalize_initializers()
+        self._normalize_datasets()
         self._normalize_scenario()
         self._normalize_server()
 
@@ -220,6 +240,27 @@ class ConfigurationLoader(YamlLoadable):
             else:
                 raise ValueError(f"Initializer entry must be a string or dict, got: {type(entry).__name__}")
         self._initializer_configs = normalized
+
+    def _normalize_datasets(self) -> None:
+        """
+        Normalize dataset entries to DatasetConfig objects.
+
+        Accepts plain string names or ``{"name": ..., "args": {...}}`` dicts.
+
+        Raises:
+            ValueError: If a dataset entry is missing a 'name' field or has an invalid type.
+        """
+        normalized: list[DatasetConfig] = []
+        for entry in self.datasets:
+            if isinstance(entry, str):
+                normalized.append(DatasetConfig(name=entry))
+            elif isinstance(entry, dict):
+                if "name" not in entry:
+                    raise ValueError(f"Dataset configuration must have a 'name' field. Got: {entry}")
+                normalized.append(DatasetConfig(name=entry["name"], args=entry.get("args")))
+            else:
+                raise ValueError(f"Dataset entry must be a string or dict, got: {type(entry).__name__}")
+        self._dataset_configs = normalized
 
     def _normalize_scenario(self) -> None:
         """
@@ -597,13 +638,15 @@ class ConfigurationLoader(YamlLoadable):
         Load the configured seed datasets into memory.
 
         Fetches each dataset named in the ``datasets`` block and adds its seeds
-        to ``CentralMemory``. This runs after PyRIT initialization so that memory
-        is available. No-op when no datasets are configured.
+        to ``CentralMemory``. Datasets declared as ``{"name": ..., "args": {...}}``
+        have their args passed to the loader constructor. This runs after PyRIT
+        initialization so that memory is available. No-op when no datasets are
+        configured.
 
         Raises:
             ValueError: If any configured dataset name does not exist.
         """
-        if not self.datasets:
+        if not self._dataset_configs:
             return
 
         import logging
@@ -612,9 +655,17 @@ class ConfigurationLoader(YamlLoadable):
         from pyrit.memory import CentralMemory
 
         logger = logging.getLogger(__name__)
-        logger.info("Loading %d dataset(s) from configuration...", len(self.datasets))
+        logger.info("Loading %d dataset(s) from configuration...", len(self._dataset_configs))
 
-        datasets = await SeedDatasetProvider.fetch_datasets_async(dataset_names=self.datasets)
+        dataset_names = [config.name for config in self._dataset_configs]
+        dataset_parameters = {
+            config.name: dict(config.args) for config in self._dataset_configs if config.args
+        }
+
+        datasets = await SeedDatasetProvider.fetch_datasets_async(
+            dataset_names=dataset_names,
+            dataset_parameters=dataset_parameters or None,
+        )
 
         memory = CentralMemory.get_memory_instance()
         await memory.add_seed_datasets_to_memory_async(datasets=datasets, added_by="ConfigurationLoader")

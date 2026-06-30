@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from pyrit.common.deprecation import print_deprecation_message
 from pyrit.datasets.seed_datasets.seed_metadata import SeedDatasetFilter, SeedDatasetLoadTime, SeedDatasetMetadata
+from pyrit.models.parameter import Parameter
 from pyrit.models.seeds import SeedDataset
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ class SeedDatasetProvider(ABC):
     """
 
     _registry: dict[str, type["SeedDatasetProvider"]] = {}
+    _parameters: dict[str, list[Parameter]] = {}
     load_time: SeedDatasetLoadTime = SeedDatasetLoadTime.UNINITIALIZED
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
@@ -63,7 +65,30 @@ class SeedDatasetProvider(ABC):
             )
         if not inspect.isabstract(cls) and getattr(cls, "should_register", True):
             SeedDatasetProvider._registry[cls.__name__] = cls
+            SeedDatasetProvider._parameters[cls.__name__] = cls._derive_dataset_parameters()
             logger.debug(f"Registered dataset provider: {cls.__name__}")
+
+    @classmethod
+    def _derive_dataset_parameters(cls) -> list[Parameter]:
+        """
+        Derive the user-settable ``Parameter`` list from this loader's constructor.
+
+        Only constructor parameters whose annotation is wrapped with
+        ``DatasetParameter`` are surfaced; framework plumbing arguments are left
+        out so callers see exactly the knobs a dataset exposes.
+
+        Returns:
+            list[Parameter]: One ``Parameter`` per ``DatasetParameter``-marked argument.
+        """
+        from pyrit.datasets.seed_datasets.dataset_parameter import is_dataset_parameter
+        from pyrit.registry.resolution import derive_parameters
+
+        try:
+            sig = inspect.signature(cls.__init__)
+        except (ValueError, TypeError):
+            return []
+        marked = {name for name, param in sig.parameters.items() if is_dataset_parameter(param.annotation)}
+        return [param for param in derive_parameters(cls=cls) if param.name in marked]
 
     @property
     @abstractmethod
@@ -148,6 +173,20 @@ class SeedDatasetProvider(ABC):
             dict[str, type[SeedDatasetProvider]]: Dictionary mapping class names to provider classes.
         """
         return cls._registry.copy()
+
+    @classmethod
+    def get_dataset_parameters(cls, *, class_name: str) -> list[Parameter]:
+        """
+        Get the introspected parameters for a registered provider class.
+
+        Args:
+            class_name (str): The registered provider class name (e.g. ``"_HarmBenchDataset"``).
+
+        Returns:
+            list[Parameter]: The provider's ``DatasetParameter``-marked parameters,
+                or an empty list when the class is unknown or exposes none.
+        """
+        return list(cls._parameters.get(class_name, []))
 
     @classmethod
     async def get_all_dataset_names_async(cls, filters: SeedDatasetFilter | None = None) -> list[str]:
@@ -280,6 +319,7 @@ class SeedDatasetProvider(ABC):
         cls,
         *,
         dataset_names: list[str] | None = None,
+        dataset_parameters: dict[str, dict[str, Any]] | None = None,
         cache: bool = True,
         max_concurrency: int = 5,
     ) -> list[SeedDataset]:
@@ -291,6 +331,10 @@ class SeedDatasetProvider(ABC):
         Args:
             dataset_names: Optional list of dataset names to fetch. If None, fetches all.
                           Names should match the dataset_name property of providers.
+            dataset_parameters: Optional mapping of dataset name to a flat dict of
+                          constructor argument values. Values are coerced to the
+                          loader's declared parameter types before the provider is
+                          constructed. Datasets absent from the mapping use their defaults.
             cache: Whether to cache the fetched datasets. Defaults to True.
                    This uses DB_DATA_PATH for caching remote datasets.
             max_concurrency: Maximum number of datasets to fetch concurrently. Defaults to 5.
@@ -312,6 +356,10 @@ class SeedDatasetProvider(ABC):
             ...     dataset_names=["harmbench", "DarkBench"]
             ... )
         """
+        from pyrit.registry.resolution import resolve_constructor_args
+
+        dataset_parameters = dataset_parameters or {}
+
         # Validate dataset names if specified
         if dataset_names is not None:
             available_names = await cls.get_all_dataset_names_async()
@@ -328,7 +376,13 @@ class SeedDatasetProvider(ABC):
             Returns:
                 tuple[str, SeedDataset] | None: Tuple of provider name and dataset, or None if filtered.
             """
-            provider = provider_class()
+            # Resolve and coerce any caller-supplied constructor parameters by dataset name.
+            raw_args = dataset_parameters.get(provider_class().dataset_name)
+            if raw_args:
+                resolved = resolve_constructor_args(cls=provider_class, raw_args=raw_args)
+                provider = provider_class(**resolved)
+            else:
+                provider = provider_class()
 
             # Apply dataset name filter if specified
             if dataset_names is not None and provider.dataset_name not in dataset_names:

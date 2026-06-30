@@ -235,6 +235,22 @@ async def test_load_datasets_async(client, mock_httpx_client):
     assert call.kwargs["json"] == {"dataset_names": ["airt_hate"], "cache": False}
 
 
+async def test_load_datasets_async_with_parameters(client, mock_httpx_client):
+    payload = {"loaded_datasets": [{"name": "harmbench", "seed_count": 1}], "total_seeds": 1}
+    mock_httpx_client.post.return_value = _make_response(json_data=payload)
+    result = await client.load_datasets_async(
+        dataset_names=["harmbench"],
+        dataset_parameters={"harmbench": {"category": "chemical_biological"}},
+    )
+    assert result == payload
+    call = mock_httpx_client.post.call_args
+    assert call.kwargs["json"] == {
+        "dataset_names": ["harmbench"],
+        "cache": True,
+        "dataset_parameters": {"harmbench": {"category": "chemical_biological"}},
+    }
+
+
 async def test_load_datasets_async_raises_on_error(client, mock_httpx_client):
     resp = _make_response(status_code=400, json_data={"detail": "Dataset(s) not found"})
     resp.raise_for_status.side_effect = httpx.HTTPStatusError("400", request=MagicMock(), response=resp)

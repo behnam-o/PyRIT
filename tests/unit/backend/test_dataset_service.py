@@ -11,6 +11,7 @@ import pytest
 
 from pyrit.backend.models.datasets import LoadDatasetRequest
 from pyrit.backend.services.dataset_service import DatasetService, get_dataset_service
+from pyrit.models.parameter import Parameter
 from pyrit.models.seeds import SeedDataset
 
 
@@ -18,6 +19,17 @@ def _seed_dataset(*, name: str, count: int) -> SeedDataset:
     """Build a small SeedDataset with ``count`` prompt seeds."""
     seeds = [{"value": f"{name}-{i}", "data_type": "text"} for i in range(count)]
     return SeedDataset(dataset_name=name, seeds=seeds)
+
+
+def _provider_class(*, name: str) -> type:
+    """Build a minimal provider class whose instances report ``name``."""
+
+    class _FakeProvider:
+        @property
+        def dataset_name(self) -> str:
+            return name
+
+    return _FakeProvider
 
 
 class TestListDatasets:
@@ -29,11 +41,22 @@ class TestListDatasets:
         memory = MagicMock()
         memory.get_seed_dataset_names.return_value = ["airt_hate"]
 
+        providers = {
+            "_AirtHate": _provider_class(name="airt_hate"),
+            "_HarmBench": _provider_class(name="harmbench"),
+        }
+        parameters = {
+            "_HarmBench": [Parameter(name="category", description="Filter by category.", param_type=str)],
+        }
+
         with (
             patch(
-                "pyrit.backend.services.dataset_service.SeedDatasetProvider.get_all_dataset_names_async",
-                new_callable=AsyncMock,
-                return_value=["airt_hate", "harmbench"],
+                "pyrit.backend.services.dataset_service.SeedDatasetProvider.get_all_providers",
+                return_value=providers,
+            ),
+            patch(
+                "pyrit.backend.services.dataset_service.SeedDatasetProvider.get_dataset_parameters",
+                side_effect=lambda *, class_name: parameters.get(class_name, []),
             ),
             patch(
                 "pyrit.backend.services.dataset_service.CentralMemory.get_memory_instance",
@@ -45,6 +68,11 @@ class TestListDatasets:
         by_name = {item.name: item.loaded for item in result.items}
         assert by_name == {"airt_hate": True, "harmbench": False}
 
+        by_params = {item.name: item.parameters for item in result.items}
+        assert by_params["airt_hate"] == []
+        assert [p.name for p in by_params["harmbench"]] == ["category"]
+        assert by_params["harmbench"][0].required is False
+
     async def test_list_datasets_empty(self):
         service = DatasetService()
         memory = MagicMock()
@@ -52,9 +80,8 @@ class TestListDatasets:
 
         with (
             patch(
-                "pyrit.backend.services.dataset_service.SeedDatasetProvider.get_all_dataset_names_async",
-                new_callable=AsyncMock,
-                return_value=[],
+                "pyrit.backend.services.dataset_service.SeedDatasetProvider.get_all_providers",
+                return_value={},
             ),
             patch(
                 "pyrit.backend.services.dataset_service.CentralMemory.get_memory_instance",

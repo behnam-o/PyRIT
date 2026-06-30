@@ -51,6 +51,13 @@ class TestParseArgs:
         args = pyrit_scan.parse_args(["--load-dataset", "airt_hate", "harmbench"])
         assert args.load_dataset == ["airt_hate", "harmbench"]
 
+    def test_parse_args_load_dataset_with_params(self):
+        args = pyrit_scan.parse_args(["--load-dataset", "airt_hate", "harmbench:category=chemical_biological"])
+        assert args.load_dataset == [
+            "airt_hate",
+            {"name": "harmbench", "args": {"category": "chemical_biological"}},
+        ]
+
     def test_parse_args_with_strategies(self):
         args = pyrit_scan.parse_args(["test_scenario", "--strategies", "s1", "s2"])
         assert args.scenario_strategies == ["s1", "s2"]
@@ -265,6 +272,27 @@ class TestMain:
         assert result == 0
         mock_client.load_datasets_async.assert_awaited_once()
         assert mock_client.load_datasets_async.call_args.kwargs["dataset_names"] == ["airt_hate"]
+        assert mock_client.load_datasets_async.call_args.kwargs["dataset_parameters"] is None
+
+    @patch("pyrit.cli._server_launcher.ServerLauncher.probe_health_async", new_callable=AsyncMock, return_value=True)
+    @patch("pyrit.cli.api_client.PyRITApiClient")
+    def test_main_load_dataset_with_params(self, mock_client_class, mock_probe):
+        """Test main with --load-dataset and name:key=val params."""
+        mock_client = _mock_api_client()
+        mock_client.load_datasets_async.return_value = {
+            "loaded_datasets": [{"name": "harmbench", "seed_count": 3}],
+            "total_seeds": 3,
+        }
+        mock_client_class.return_value = mock_client
+
+        result = pyrit_scan.main(["--load-dataset", "airt_hate", "harmbench:category=chemical_biological"])
+
+        assert result == 0
+        mock_client.load_datasets_async.assert_awaited_once()
+        kwargs = mock_client.load_datasets_async.call_args.kwargs
+        assert kwargs["dataset_names"] == ["airt_hate", "harmbench"]
+        assert kwargs["dataset_parameters"] == {"harmbench": {"category": "chemical_biological"}}
+
 
     def test_main_no_args_shows_help(self):
         """Test main with no arguments shows help."""

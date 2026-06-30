@@ -416,10 +416,36 @@ class TestConfigurationLoaderInitialization:
 
         mock_init.assert_called_once()
         mock_provider.fetch_datasets_async.assert_awaited_once_with(
-            dataset_names=["airt_illegal", "airt_malware"]
+            dataset_names=["airt_illegal", "airt_malware"],
+            dataset_parameters=None,
         )
         mock_memory.add_seed_datasets_to_memory_async.assert_awaited_once_with(
             datasets=fetched, added_by="ConfigurationLoader"
+        )
+
+    @mock.patch("pyrit.memory.CentralMemory")
+    @mock.patch("pyrit.datasets.SeedDatasetProvider")
+    @mock.patch("pyrit.setup.configuration_loader.initialize_pyrit_async")
+    async def test_initialize_pyrit_async_loads_datasets_with_params(self, mock_init, mock_provider, mock_memory_cls):
+        """Test that dataset args are forwarded to fetch_datasets_async as dataset_parameters."""
+        fetched = [mock.MagicMock()]
+        mock_provider.fetch_datasets_async = mock.AsyncMock(return_value=fetched)
+        mock_memory = mock.MagicMock()
+        mock_memory.add_seed_datasets_to_memory_async = mock.AsyncMock()
+        mock_memory_cls.get_memory_instance.return_value = mock_memory
+
+        config = ConfigurationLoader(
+            memory_db_type="in_memory",
+            datasets=[
+                "airt_illegal",
+                {"name": "harmbench", "args": {"category": "chemical_biological"}},
+            ],
+        )
+        await config.initialize_pyrit_async()
+
+        mock_provider.fetch_datasets_async.assert_awaited_once_with(
+            dataset_names=["airt_illegal", "harmbench"],
+            dataset_parameters={"harmbench": {"category": "chemical_biological"}},
         )
 
     @mock.patch("pyrit.datasets.SeedDatasetProvider")

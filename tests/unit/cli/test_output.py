@@ -243,6 +243,30 @@ def test_print_dataset_list_full(capsys):
     assert "Total datasets: 2 (1 loaded)" in captured.out
 
 
+def test_print_dataset_list_with_parameters(capsys):
+    items = [
+        {
+            "name": "harmbench",
+            "loaded": False,
+            "parameters": [
+                {
+                    "name": "category",
+                    "required": False,
+                    "default": None,
+                    "choices": None,
+                    "description": "Filter behaviors by category.",
+                }
+            ],
+        },
+    ]
+    _output.print_dataset_list(items=items)
+    captured = capsys.readouterr()
+    assert "Parameters:" in captured.out
+    assert "category" in captured.out
+    assert "[default: None]" in captured.out
+    assert "Filter behaviors by category." in captured.out
+
+
 def test_print_dataset_load_result_empty(capsys):
     _output.print_dataset_load_result(result={"loaded_datasets": [], "total_seeds": 0})
     captured = capsys.readouterr()
