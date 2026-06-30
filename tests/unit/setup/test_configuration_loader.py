@@ -415,9 +415,7 @@ class TestConfigurationLoaderInitialization:
         await config.initialize_pyrit_async()
 
         mock_init.assert_called_once()
-        mock_provider.fetch_datasets_async.assert_awaited_once_with(
-            dataset_names=["airt_illegal", "airt_malware"]
-        )
+        mock_provider.fetch_datasets_async.assert_awaited_once_with(dataset_names=["airt_illegal", "airt_malware"])
         mock_memory.add_seed_datasets_to_memory_async.assert_awaited_once_with(
             datasets=fetched, added_by="ConfigurationLoader"
         )
