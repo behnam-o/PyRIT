@@ -56,20 +56,15 @@ from pyrit.backend.models.datasets import (
     LoadedDataset,
 )
 from pyrit.backend.models.initializers import (
-    InitializerParameterSummary,
     ListRegisteredInitializersResponse,
-    RegisteredInitializer,
     RegisterInitializerRequest,
 )
 from pyrit.backend.models.scenarios import (
     ListRegisteredScenariosResponse,
-    RegisteredScenario,
-    ScenarioParameterSummary,
+    ScenarioRunListResponse,
 )
 from pyrit.backend.models.targets import (
     CreateTargetRequest,
-    TargetCapabilitiesInfo,
-    TargetInstance,
     TargetListResponse,
 )
 
@@ -121,16 +116,11 @@ __all__ = [
     "LoadedDataset",
     # Scenarios
     "ListRegisteredScenariosResponse",
-    "RegisteredScenario",
-    "ScenarioParameterSummary",
+    "ScenarioRunListResponse",
     # Initializers
-    "InitializerParameterSummary",
     "ListRegisteredInitializersResponse",
-    "RegisteredInitializer",
     "RegisterInitializerRequest",
     # Targets
     "CreateTargetRequest",
-    "TargetCapabilitiesInfo",
-    "TargetInstance",
     "TargetListResponse",
 ]
