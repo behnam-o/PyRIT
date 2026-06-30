@@ -13,7 +13,7 @@ import is deferred to each function so importing this module stays cheap.
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pyrit.models import ScenarioResult
