@@ -1,6 +1,8 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+import asyncio
+import inspect as inspect_module
 import os
 import tempfile
 from collections.abc import Generator
@@ -11,6 +13,56 @@ from sqlalchemy import inspect
 
 from pyrit.memory.central_memory import CentralMemory
 from pyrit.memory.sqlite_memory import SQLiteMemory
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers",
+        "probabilistic(runs, min_pass_rate): run the test body `runs` times and "
+        "pass only if the fraction of successful runs is at least `min_pass_rate`. "
+        "The whole thing is reported as a single test.",
+    )
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_pyfunc_call(pyfuncitem: pytest.Function):
+    """Run tests marked ``probabilistic`` multiple times and apply a pass-rate threshold.
+
+    Returning a truthy value short-circuits pytest's default call, so the many
+    trials collapse into a single reported test whose outcome (and therefore the
+    process exit code) reflects the threshold.
+    """
+    marker = pyfuncitem.get_closest_marker("probabilistic")
+    if marker is None:
+        return None
+
+    runs: int = marker.kwargs.get("runs", 100)
+    min_pass_rate: float = marker.kwargs.get("min_pass_rate", 0.5)
+
+    testfunction = pyfuncitem.obj
+    testargs = {name: pyfuncitem.funcargs[name] for name in pyfuncitem._fixtureinfo.argnames}
+    is_async = inspect_module.iscoroutinefunction(testfunction)
+
+    passes = 0
+    for _ in range(runs):
+        try:
+            if is_async:
+                asyncio.run(testfunction(**testargs))
+            else:
+                testfunction(**testargs)
+            passes += 1
+        except AssertionError:
+            pass
+
+    pass_rate = passes / runs
+    if pass_rate < min_pass_rate:
+        pytest.fail(
+            f"Probabilistic test failed: {passes}/{runs} runs passed "
+            f"(rate {pass_rate:.2%} < required {min_pass_rate:.2%})",
+            pytrace=False,
+        )
+
+    return True
 
 # This limits retries and speeds up execution
 os.environ["CUSTOM_RESULT_RETRY_MAX_NUM_ATTEMPTS"] = "5"
