@@ -34,6 +34,7 @@ from pyrit.backend.routes import (
     targets,
     version,
 )
+from pyrit.backend.services.target_service import configure_target_service
 from pyrit.setup.configuration_loader import ConfigurationLoader
 
 # Check for development mode from environment variable
@@ -57,6 +58,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     config = ConfigurationLoader.load_with_overrides(config_file=config_file)
     await config.initialize_pyrit_async()
+    configure_target_service(api_key_vault_url=config.target_api_key_vault_url)
 
     # Expose config values to route handlers via app.state
     default_labels: dict[str, str] = {}

@@ -12,10 +12,13 @@ Targets can be:
 - Retrieved from registry (pre-registered at startup or created earlier)
 """
 
+import asyncio
 import logging
+import re
 from functools import lru_cache
 from typing import Any, Literal, cast
 
+from pyrit.auth.key_vault_secret_store import KeyVaultSecretStore
 from pyrit.backend.mappers.target_mappers import target_object_to_instance
 from pyrit.backend.models.common import PaginationInfo
 from pyrit.backend.models.targets import (
@@ -24,10 +27,14 @@ from pyrit.backend.models.targets import (
     TargetCatalogResponse,
     TargetListResponse,
 )
+from pyrit.memory import CentralMemory
+from pyrit.models import OpenAITargetConfig
 from pyrit.models.catalog.target import TargetInstance
 from pyrit.registry import TargetRegistry
 
 logger = logging.getLogger(__name__)
+
+_target_api_key_vault_url: str | None = None
 
 
 class TargetService:
@@ -40,9 +47,10 @@ class TargetService:
     service only orchestrates the request → registry hand-off.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, api_key_vault_url: str | None = None) -> None:
         """Initialize the target service."""
         self._registry = TargetRegistry.get_registry_singleton()
+        self._secret_store = KeyVaultSecretStore(vault_url=api_key_vault_url) if api_key_vault_url else None
 
     def _build_instance_from_object(self, *, target_registry_name: str, target_obj: Any) -> TargetInstance:
         """
@@ -182,7 +190,6 @@ class TargetService:
             raise ValueError(
                 f"Target type '{request.type}' not found. Available types: {self._registry.get_class_names()}"
             )
-
         target_cls = self._registry.get_class(request.type)
         params: dict[str, Any] = dict(request.params)
 
@@ -199,10 +206,37 @@ class TargetService:
         else:
             target_obj = target_cls(**params)
 
-        self._registry.instances.register(target_obj)
-
         target_registry_name = target_obj.get_identifier().unique_name
+        if request.type != "OpenAIChatTarget":
+            self._registry.instances.register(target_obj, name=target_registry_name)
+            return self._build_instance_from_object(target_registry_name=target_registry_name, target_obj=target_obj)
+
+        secret_uri = await self._persist_api_key_async(
+            target_registry_name=target_registry_name,
+            api_key=cast("str | None", params.pop("api_key", None)),
+        )
+        persisted_target = OpenAITargetConfig(
+            target_registry_name=target_registry_name,
+            endpoint=cast("str", params["endpoint"]),
+            model_name=cast("str", params["model_name"]),
+            auth_mode=request.auth_mode,
+            api_key_secret_uri=secret_uri,
+        )
+        memory = CentralMemory.get_memory_instance()
+        await asyncio.to_thread(memory.add_openai_target_config, target=persisted_target)
+        self._registry.instances.register(target_obj, name=target_registry_name)
+
         return self._build_instance_from_object(target_registry_name=target_registry_name, target_obj=target_obj)
+
+    async def _persist_api_key_async(self, *, target_registry_name: str, api_key: str | None) -> str | None:
+        if not api_key:
+            return None
+        if self._secret_store is None:
+            raise ValueError(
+                "Target API key persistence requires 'target_api_key_vault_url' in the PyRIT configuration."
+            )
+        secret_name = re.sub(r"[^0-9A-Za-z-]", "-", f"pyrit-target-{target_registry_name}")[:127]
+        return await self._secret_store.set_secret_async(name=secret_name, value=api_key)
 
     def _has_reference_params(self, *, target_type: str) -> bool:
         """
@@ -229,4 +263,11 @@ def get_target_service() -> TargetService:
     Returns:
         The singleton TargetService instance.
     """
-    return TargetService()
+    return TargetService(api_key_vault_url=_target_api_key_vault_url)
+
+
+def configure_target_service(*, api_key_vault_url: str | None) -> None:
+    """Configure the cached backend target service."""
+    global _target_api_key_vault_url
+    _target_api_key_vault_url = api_key_vault_url
+    get_target_service.cache_clear()

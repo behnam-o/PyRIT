@@ -32,6 +32,7 @@ from pyrit.memory.memory_models import (
     ConversationEntry,
     ConverterIdentifierEntry,
     EmbeddingDataEntry,
+    OpenAITargetConfigEntry,
     PromptConverterIdentifierEntry,
     PromptMemoryEntry,
     ScenarioIdentifierEntry,
@@ -63,6 +64,7 @@ from pyrit.models import (
     IdentifierType,
     Message,
     MessagePiece,
+    OpenAITargetConfig,
     ScenarioIdentifier,
     ScenarioResult,
     Score,
@@ -148,6 +150,15 @@ class MemoryInterface(abc.ABC):
         from pyrit.memory.memory_embedding import default_memory_embedding_factory
 
         self.memory_embedding = default_memory_embedding_factory(embedding_model=embedding_model)
+
+    def add_openai_target_config(self, *, target: OpenAITargetConfig) -> None:
+        """Persist a sanitized, reconstructable target configuration."""
+        self._insert_entry(OpenAITargetConfigEntry.from_domain_model(target))
+
+    def get_openai_target_configs(self) -> Sequence[OpenAITargetConfig]:
+        """Return all persisted target configurations."""
+        entries = self._query_entries(OpenAITargetConfigEntry, order_by=OpenAITargetConfigEntry.target_registry_name)
+        return [entry.to_domain_model() for entry in entries]
 
     def disable_embedding(self) -> None:
         """

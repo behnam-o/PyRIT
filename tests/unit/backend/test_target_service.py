@@ -6,7 +6,7 @@ Tests for backend target service.
 """
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -301,7 +301,7 @@ class TestCreateTarget:
     async def test_create_target_model_name_not_overridden_by_env_var(self, sqlite_instance) -> None:
         """Test that explicit model_name is not overridden by underlying_model env var."""
         with patch.dict(os.environ, {"OPENAI_CHAT_UNDERLYING_MODEL": "gpt-4o"}):
-            service = TargetService()
+            service = TargetService(api_key_vault_url="https://vault.vault.azure.net")
 
             request = CreateTargetRequest(
                 type="OpenAIChatTarget",
@@ -312,7 +312,13 @@ class TestCreateTarget:
                 },
             )
 
-            result = await service.create_target_async(request=request)
+            with patch.object(
+                service._secret_store,
+                "set_secret_async",
+                new_callable=AsyncMock,
+                return_value="https://vault.vault.azure.net/secrets/key/version",
+            ):
+                result = await service.create_target_async(request=request)
 
             assert result.identifier.model_name == "claude-sonnet-4-6"
             # underlying_model_name is empty since no underlying_model was passed
@@ -320,7 +326,7 @@ class TestCreateTarget:
 
     async def test_create_target_with_different_underlying_model(self, sqlite_instance) -> None:
         """Test that explicit underlying_model is used when it differs from model_name."""
-        service = TargetService()
+        service = TargetService(api_key_vault_url="https://vault.vault.azure.net")
 
         request = CreateTargetRequest(
             type="OpenAIChatTarget",
@@ -332,10 +338,84 @@ class TestCreateTarget:
             },
         )
 
-        result = await service.create_target_async(request=request)
+        with patch.object(
+            service._secret_store,
+            "set_secret_async",
+            new_callable=AsyncMock,
+            return_value="https://vault.vault.azure.net/secrets/key/version",
+        ):
+            result = await service.create_target_async(request=request)
 
         assert result.identifier.model_name == "my-gpt4o-deployment"
         assert result.identifier.underlying_model_name == "gpt-4o"
+
+    async def test_create_api_key_target_requires_configured_vault(self, sqlite_instance) -> None:
+        service = TargetService()
+        request = CreateTargetRequest(
+            type="OpenAIChatTarget",
+            params={
+                "model_name": "model",
+                "endpoint": "https://example.test",
+                "api_key": "secret",
+            },
+        )
+
+        with pytest.raises(ValueError, match="target_api_key_vault_url"):
+            await service.create_target_async(request=request)
+
+        assert sqlite_instance.get_openai_target_configs() == []
+        assert len(service._registry.instances) == 0
+
+    async def test_create_api_key_target_persists_secret_reference(self, sqlite_instance) -> None:
+        service = TargetService(api_key_vault_url="https://vault.vault.azure.net")
+        request = CreateTargetRequest(
+            type="OpenAIChatTarget",
+            params={
+                "model_name": "model",
+                "endpoint": "https://example.test",
+                "api_key": "secret",
+            },
+        )
+        secret_uri = "https://vault.vault.azure.net/secrets/key/version"
+
+        with patch.object(
+            service._secret_store,
+            "set_secret_async",
+            new_callable=AsyncMock,
+            return_value=secret_uri,
+        ):
+            result = await service.create_target_async(request=request)
+
+        configs = sqlite_instance.get_openai_target_configs()
+        assert len(configs) == 1
+        assert configs[0].target_registry_name == result.target_registry_name
+        assert configs[0].api_key_secret_uri == secret_uri
+        assert "secret" not in configs[0].model_dump().values()
+
+    async def test_create_api_key_target_does_not_persist_when_vault_write_fails(self, sqlite_instance) -> None:
+        service = TargetService(api_key_vault_url="https://vault.vault.azure.net")
+        request = CreateTargetRequest(
+            type="OpenAIChatTarget",
+            params={
+                "model_name": "model",
+                "endpoint": "https://example.test",
+                "api_key": "secret",
+            },
+        )
+
+        with (
+            patch.object(
+                service._secret_store,
+                "set_secret_async",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("vault unavailable"),
+            ),
+            pytest.raises(RuntimeError, match="vault unavailable"),
+        ):
+            await service.create_target_async(request=request)
+
+        assert sqlite_instance.get_openai_target_configs() == []
+        assert len(service._registry.instances) == 0
 
 
 class TestCreateTargetEntraAuth:

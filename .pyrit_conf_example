@@ -107,6 +107,12 @@ operation: op_trash_panda
 # env_akv_ref:
 #   - https://my-vault.vault.azure.net/secrets/my-pyrit-env
 
+# Target API Key Vault
+# --------------------
+# Vault used by the backend to store API keys for database-backed targets.
+# This is separate from env_akv_ref: it stores one secret per persisted target.
+# target_api_key_vault_url: https://my-vault.vault.azure.net
+
 # Max Concurrent Scenario Runs
 # ----------------------------
 # Maximum number of scenario runs that can execute concurrently in the backend.

@@ -53,6 +53,7 @@ from pyrit.models import (
     ConverterIdentifier,
     EvaluationIdentifier,
     MessagePiece,
+    OpenAITargetConfig,
     PromptDataType,
     ScenarioEvaluationIdentifier,
     ScenarioIdentifier,
@@ -417,6 +418,47 @@ class DomainBackedEntry(Base, Generic[TDomain]):
                 "from_domain_model(...); every concrete entry must define how its "
                 "domain model is converted into a row."
             )
+
+
+class OpenAITargetConfigEntry(DomainBackedEntry[OpenAITargetConfig]):
+    """Persistence projection for a reconstructable target configuration."""
+
+    __tablename__ = "Targets"
+    __table_args__ = {"extend_existing": True}
+
+    target_registry_name: Mapped[str] = mapped_column(String, primary_key=True)
+    endpoint: Mapped[str] = mapped_column(String, nullable=False)
+    model_name: Mapped[str] = mapped_column(String, nullable=False)
+    auth_mode: Mapped[Literal["api_key", "identity"]] = mapped_column(String, nullable=False)
+    api_key_secret_uri: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    @classmethod
+    def from_domain_model(cls, domain_model: OpenAITargetConfig) -> Self:
+        """
+        Build an unsaved target row from its domain model.
+
+        Args:
+            domain_model (OpenAITargetConfig): The target configuration to persist.
+
+        Returns:
+            Self: An unsaved target configuration row.
+        """
+        return cls(**domain_model.model_dump())
+
+    def to_domain_model(self) -> OpenAITargetConfig:
+        """
+        Build the canonical domain model represented by this row.
+
+        Returns:
+            OpenAITargetConfig: The reconstructed target configuration.
+        """
+        return OpenAITargetConfig(
+            target_registry_name=self.target_registry_name,
+            endpoint=self.endpoint,
+            model_name=self.model_name,
+            auth_mode=self.auth_mode,
+            api_key_secret_uri=self.api_key_secret_uri,
+        )
 
 
 T = TypeVar("T", bound=ComponentIdentifier)

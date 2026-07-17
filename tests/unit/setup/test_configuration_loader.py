@@ -42,7 +42,16 @@ class TestConfigurationLoader:
         assert config.initialization_scripts is None  # None means "use defaults"
         assert config.env_files is None  # None means "use defaults"
         assert config.env_akv_ref is None
+        assert config.target_api_key_vault_url is None
         assert config.silent is False
+
+    def test_target_api_key_vault_url_from_dict(self):
+        """Test loading the dedicated target API key vault URL."""
+        config = ConfigurationLoader.from_dict(
+            {"target_api_key_vault_url": "https://target-secrets.vault.azure.net"}
+        )
+
+        assert config.target_api_key_vault_url == "https://target-secrets.vault.azure.net"
 
     def test_valid_memory_db_types_snake_case(self):
         """Test all valid memory database types in snake_case."""

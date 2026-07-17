@@ -122,6 +122,7 @@ class ConfigurationLoader(YamlLoadable):
     operation: str | None = None
     max_concurrent_scenario_runs: int = 3
     allow_custom_initializers: bool = False
+    target_api_key_vault_url: str | None = None
     server: dict[str, Any] | None = None
     extensions: dict[str, Any] = field(default_factory=dict)
 
@@ -316,6 +317,7 @@ class ConfigurationLoader(YamlLoadable):
                 config_data["initialization_scripts"] = default_config.initialization_scripts
                 config_data["env_files"] = default_config.env_files
                 config_data["env_akv_ref"] = default_config.env_akv_ref
+                config_data["target_api_key_vault_url"] = default_config.target_api_key_vault_url
                 config_data["silent"] = default_config.silent
                 if default_config.operator:
                     config_data["operator"] = default_config.operator
@@ -342,6 +344,7 @@ class ConfigurationLoader(YamlLoadable):
             config_data["initialization_scripts"] = explicit_config.initialization_scripts
             config_data["env_files"] = explicit_config.env_files
             config_data["env_akv_ref"] = explicit_config.env_akv_ref
+            config_data["target_api_key_vault_url"] = explicit_config.target_api_key_vault_url
             config_data["silent"] = explicit_config.silent
             if explicit_config.operator:
                 config_data["operator"] = explicit_config.operator
