@@ -5,14 +5,21 @@ import {
   Button,
   Link,
   Spinner,
+  Tab,
+  TabList,
 } from '@fluentui/react-components'
 import { AddRegular, ArrowSyncRegular } from '@fluentui/react-icons'
-import { targetsApi } from '../../services/api'
-import { toApiError } from '../../services/errors'
-import type { TargetInstance } from '../../types'
+
+import { targetsApi } from '@/services/api'
+import { toApiError } from '@/services/errors'
+import type { TargetInstance } from '@/types'
+import { targetType } from '@/utils/targetIdentity'
+
 import CreateTargetDialog from './CreateTargetDialog'
 import TargetTable from './TargetTable'
 import { useTargetConfigStyles } from './TargetConfig.styles'
+
+type TargetConfigPane = 'instances' | 'openai'
 
 interface TargetConfigProps {
   activeTarget: TargetInstance | null
@@ -25,6 +32,7 @@ export default function TargetConfig({ activeTarget, onSetActiveTarget }: Target
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [selectedPane, setSelectedPane] = useState<TargetConfigPane>('instances')
   // Counter used to re-trigger the fetch effect from event handlers (Refresh,
   // dialog close) without invoking setState synchronously in the effect body.
   const [refetchCount, setRefetchCount] = useState(0)
@@ -72,6 +80,17 @@ export default function TargetConfig({ activeTarget, onSetActiveTarget }: Target
     fetchTargets()
   }, [fetchTargets])
 
+  const openAiTargets = targets.filter((target: TargetInstance) => targetType(target) === 'OpenAIChatTarget')
+  const activeOpenAiTarget = activeTarget && targetType(activeTarget) === 'OpenAIChatTarget'
+    ? activeTarget
+    : null
+
+  const handlePaneSelect = (_event: unknown, data: { value: unknown }): void => {
+    if (data.value === 'instances' || data.value === 'openai') {
+      setSelectedPane(data.value)
+    }
+  }
+
   return (
     <div className={styles.root} data-testid="target-config">
       <div className={styles.header}>
@@ -102,6 +121,16 @@ export default function TargetConfig({ activeTarget, onSetActiveTarget }: Target
         </div>
       </div>
 
+      <TabList
+        className={styles.tabList}
+        selectedValue={selectedPane}
+        onTabSelect={handlePaneSelect}
+        aria-label="Target configuration views"
+      >
+        <Tab value="instances">Target Instances</Tab>
+        <Tab value="openai">OpenAI Target Configs</Tab>
+      </TabList>
+
       {loading && (
         <div className={styles.loadingState}>
           <Spinner label="Loading targets..." />
@@ -114,7 +143,7 @@ export default function TargetConfig({ activeTarget, onSetActiveTarget }: Target
         </div>
       )}
 
-      {!loading && !error && targets.length === 0 && (
+      {!loading && !error && selectedPane === 'instances' && targets.length === 0 && (
         <div className={styles.emptyState}>
           <Text size={500} weight="semibold">No Targets Configured</Text>
           <Text size={300} style={{ color: tokens.colorNeutralForeground3 }}>
@@ -143,7 +172,7 @@ export default function TargetConfig({ activeTarget, onSetActiveTarget }: Target
         </div>
       )}
 
-      {!loading && !error && targets.length > 0 && (
+      {!loading && !error && selectedPane === 'instances' && targets.length > 0 && (
         <TargetTable
           targets={targets}
           activeTarget={activeTarget}
@@ -151,11 +180,43 @@ export default function TargetConfig({ activeTarget, onSetActiveTarget }: Target
         />
       )}
 
+      {!loading && !error && selectedPane === 'openai' && (
+        <div className={styles.pane}>
+          <Text size={300} style={{ color: tokens.colorNeutralForeground3 }}>
+            OpenAI chat targets added here are saved for reuse when database-backed target initialization is enabled.
+          </Text>
+          {openAiTargets.length === 0 ? (
+            <div className={styles.emptyState}>
+              <Text size={500} weight="semibold">No OpenAI Target Configs</Text>
+              <Text size={300} style={{ color: tokens.colorNeutralForeground3 }}>
+                Create an OpenAI chat target to add a reusable configuration.
+              </Text>
+              <Button
+                className={styles.touchTarget}
+                appearance="primary"
+                icon={<AddRegular />}
+                onClick={() => setDialogOpen(true)}
+              >
+                Add OpenAI Target
+              </Button>
+            </div>
+          ) : (
+            <TargetTable
+              targets={openAiTargets}
+              activeTarget={activeOpenAiTarget}
+              onSetActiveTarget={onSetActiveTarget}
+            />
+          )}
+        </div>
+      )}
+
       <CreateTargetDialog
+        key={selectedPane}
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         onCreated={handleTargetCreated}
         existingTargets={targets}
+        initialTargetType={selectedPane === 'openai' ? 'OpenAIChatTarget' : undefined}
       />
     </div>
   )

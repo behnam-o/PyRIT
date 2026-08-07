@@ -18,14 +18,17 @@ jest.mock("./CreateTargetDialog", () => {
     open,
     onClose,
     onCreated,
+    initialTargetType,
   }: {
     open: boolean;
     onClose: () => void;
     onCreated: () => void;
+    initialTargetType?: string;
   }) => {
     if (!open) return null;
     return (
       <div data-testid="create-dialog">
+        {initialTargetType && <span>{initialTargetType}</span>}
         <button onClick={onClose} data-testid="dialog-close">
           Cancel
         </button>
@@ -276,6 +279,48 @@ describe("TargetConfig", () => {
     mockedTargetsApi.listTargets.mockResolvedValue({
       items: sampleTargets,
       pagination: { limit: 200, has_more: false },
+    });
+
+    it("should show only persisted OpenAI chat target configs in the OpenAI pane", async () => {
+      const user = userEvent.setup();
+      mockedTargetsApi.listTargets.mockResolvedValue({
+        items: sampleTargets,
+        pagination: { limit: 200, has_more: false },
+      });
+
+      render(
+        <TestWrapper>
+          <TargetConfig {...defaultProps} />
+        </TestWrapper>
+      );
+
+      await screen.findByText("gpt-4");
+      await user.click(screen.getByRole("tab", { name: "OpenAI Target Configs" }));
+
+      expect(screen.getByText("gpt-4")).toBeInTheDocument();
+      expect(screen.queryByText("dall-e-3")).not.toBeInTheDocument();
+    });
+
+    it("should open the create dialog from the empty OpenAI config pane", async () => {
+      const user = userEvent.setup();
+      mockedTargetsApi.listTargets.mockResolvedValue({
+        items: [sampleTargets[1]],
+        pagination: { limit: 200, has_more: false },
+      });
+
+      render(
+        <TestWrapper>
+          <TargetConfig {...defaultProps} />
+        </TestWrapper>
+      );
+
+      await screen.findByText("OpenAIImageTarget");
+      await user.click(screen.getByRole("tab", { name: "OpenAI Target Configs" }));
+
+      expect(screen.getByText("No OpenAI Target Configs")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Add OpenAI Target" }));
+      expect(screen.getByTestId("create-dialog")).toBeInTheDocument();
+      expect(screen.getByText("OpenAIChatTarget")).toBeInTheDocument();
     });
 
     render(
