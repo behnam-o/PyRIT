@@ -79,8 +79,11 @@ function AttackResultItem({ attack }: AttackResultItemProps) {
           </MessageBar>
         )}
         {messages?.length === 0 && <Text>No messages were recorded.</Text>}
-        {messages?.map((message) => (
-          <div className={styles.message} key={`${message.turn_number}-${message.role}`}>
+        {messages?.map((message, index) => (
+          <div
+            className={styles.message}
+            key={message.message_pieces[0]?.id ?? `${message.turn_number}-${message.role}-${index}`}
+          >
             <span className={styles.messageRole}>{message.role}</span>
             <span>{messageText(message) || '(non-text content)'}</span>
           </div>
