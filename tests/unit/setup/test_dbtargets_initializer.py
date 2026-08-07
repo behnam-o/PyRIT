@@ -12,7 +12,7 @@ from pyrit.setup.initializers.dbtargets import DbtargetsInitializer
 async def test_initialize_registers_api_key_target(sqlite_instance) -> None:
     sqlite_instance.add_openai_target_config(
         target=OpenAITargetConfig(
-            target_registry_name="saved-target",
+            display_name="Saved target",
             endpoint="https://example.test",
             model_name="model",
             api_key_secret_uri="https://vault.vault.azure.net/secrets/key/version",
@@ -26,7 +26,11 @@ async def test_initialize_registers_api_key_target(sqlite_instance) -> None:
     ) as get_secret:
         await DbtargetsInitializer().initialize_async()
 
-    target = TargetRegistry.get_registry_singleton().instances.get("saved-target")
+    target = next(
+        entry.instance
+        for entry in TargetRegistry.get_registry_singleton().instances.get_all_instances()
+        if entry.instance._endpoint == "https://example.test"
+    )
     assert isinstance(target, OpenAIResponseTarget)
     assert target._api_key == "secret-value"
     get_secret.assert_awaited_once()
@@ -35,7 +39,7 @@ async def test_initialize_registers_api_key_target(sqlite_instance) -> None:
 async def test_initialize_registers_identity_target(sqlite_instance) -> None:
     sqlite_instance.add_openai_target_config(
         target=OpenAITargetConfig(
-            target_registry_name="identity-target",
+            display_name="Identity target",
             endpoint="https://example.openai.azure.com",
             model_name="model",
             auth_mode="identity",
@@ -49,5 +53,9 @@ async def test_initialize_registers_identity_target(sqlite_instance) -> None:
     ):
         await DbtargetsInitializer().initialize_async()
 
-    target = TargetRegistry.get_registry_singleton().instances.get("identity-target")
+    target = next(
+        entry.instance
+        for entry in TargetRegistry.get_registry_singleton().instances.get_all_instances()
+        if entry.instance._endpoint == "https://example.openai.azure.com"
+    )
     assert isinstance(target, OpenAIResponseTarget)

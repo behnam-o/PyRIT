@@ -31,4 +31,4 @@ class DbtargetsInitializer(PyRITInitializer):
                 model_name=target.model_name,
                 api_key=api_key,
             )
-            registry.instances.register(target_instance, name=target.target_registry_name)
+            registry.instances.register(target_instance)

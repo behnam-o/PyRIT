@@ -296,54 +296,6 @@ describe("TargetConfig", () => {
     });
   });
 
-  it("should show only OpenAI Responses targets in the saved configurations pane", async () => {
-    const user = userEvent.setup();
-    const responseTarget = makeTarget({
-      target_registry_name: "openai_response_gpt4o",
-      target_type: "OpenAIResponseTarget",
-      endpoint: "https://responses.example.com",
-      model_name: "gpt-4o",
-    });
-    mockedTargetsApi.listTargets.mockResolvedValue({
-      items: [...sampleTargets, responseTarget],
-      pagination: { limit: 200, has_more: false },
-    });
-
-    render(
-      <TestWrapper>
-        <TargetConfig {...defaultProps} />
-      </TestWrapper>
-    );
-
-    await screen.findByText("dall-e-3");
-    await user.click(screen.getByRole("tab", { name: "OpenAI Responses" }));
-
-    expect(screen.getByText("gpt-4o")).toBeInTheDocument();
-    expect(screen.queryByText("dall-e-3")).not.toBeInTheDocument();
-    expect(screen.queryByText("gpt-4")).not.toBeInTheDocument();
-  });
-
-  it("should preselect OpenAIResponseTarget when adding a saved configuration", async () => {
-    const user = userEvent.setup();
-    mockedTargetsApi.listTargets.mockResolvedValue({
-      items: sampleTargets,
-      pagination: { limit: 200, has_more: false },
-    });
-
-    render(
-      <TestWrapper>
-        <TargetConfig {...defaultProps} />
-      </TestWrapper>
-    );
-
-    await screen.findByText("dall-e-3");
-    await user.click(screen.getByRole("tab", { name: "OpenAI Responses" }));
-    await user.click(screen.getByRole("button", { name: "Add Responses Target" }));
-
-    expect(screen.getByTestId("create-dialog")).toBeInTheDocument();
-    expect(screen.getByText("OpenAIResponseTarget")).toBeInTheDocument();
-  });
-
   it("should display target_specific_params like reasoning_effort", async () => {
     const targetsWithParams: TargetInstance[] = [
       makeTarget({

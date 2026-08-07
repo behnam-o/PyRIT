@@ -12,6 +12,7 @@ import {
   ChatRegular,
   HomeRegular,
   SettingsRegular,
+  ServerRegular,
   HistoryRegular,
   PersonFeedbackRegular,
   WrenchRegular,
@@ -23,7 +24,7 @@ import { useTheme } from '../../hooks/useTheme'
 import type { ThemeMode } from '../../hooks/useTheme'
 import { useNavigationStyles } from './Navigation.styles'
 
-export type ViewName = 'home' | 'chat' | 'history' | 'config' | 'initializers'
+export type ViewName = 'home' | 'chat' | 'history' | 'config' | 'targets' | 'initializers'
 
 interface NavigationProps {
   currentView: ViewName
@@ -103,6 +104,17 @@ export default function Navigation({ currentView, onNavigate, onOpenFeedback }: 
           aria-label="Configuration"
           aria-current={currentView === 'config' ? 'page' : undefined}
           onClick={() => onNavigate('config')}
+        />
+
+        <Button
+          className={styles.navButton}
+          data-active={currentView === 'targets'}
+          appearance="subtle"
+          icon={<ServerRegular />}
+          title="Persisted Targets"
+          aria-label="Persisted Targets"
+          aria-current={currentView === 'targets' ? 'page' : undefined}
+          onClick={() => onNavigate('targets')}
         />
 
         <Button

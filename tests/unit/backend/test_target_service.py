@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from pyrit.backend.models.targets import CreateTargetRequest
+from pyrit.backend.models.targets import CreatePersistedTargetRequest, CreateTargetRequest
 from pyrit.backend.services.target_service import TargetService, get_target_service
 from pyrit.models import ComponentIdentifier
 from pyrit.prompt_target import PromptTarget, TargetCapabilities
@@ -57,6 +57,7 @@ async def _test_token_provider() -> str:
     return "test-token"
 
 
+@pytest.mark.usefixtures("patch_central_database")
 class TestListTargets:
     """Tests for TargetService.list_targets method."""
 
@@ -130,6 +131,7 @@ class TestListTargets:
         assert last_page.pagination.next_cursor is None
 
 
+@pytest.mark.usefixtures("patch_central_database")
 class TestGetTarget:
     """Tests for TargetService.get_target method."""
 
@@ -454,7 +456,7 @@ class TestCreateTarget:
         assert result.identifier.model_name == "my-gpt4o-deployment"
         assert result.identifier.underlying_model_name == "gpt-4o"
 
-    async def test_create_api_key_target_requires_configured_vault(self, sqlite_instance) -> None:
+    async def test_create_response_target_is_runtime_only(self, sqlite_instance) -> None:
         service = TargetService()
         request = CreateTargetRequest(
             type="OpenAIResponseTarget",
@@ -465,21 +467,23 @@ class TestCreateTarget:
             },
         )
 
-        with pytest.raises(ValueError, match="target_api_key_vault_url"):
-            await service.create_target_async(request=request)
+        result = await service.create_target_async(request=request)
 
         assert sqlite_instance.get_openai_target_configs() == []
-        assert len(service._registry.instances) == 0
+        assert service.get_target_object(target_registry_name=result.target_registry_name) is not None
 
-    async def test_create_api_key_target_persists_secret_reference(self, sqlite_instance) -> None:
+
+@pytest.mark.usefixtures("patch_central_database")
+class TestPersistedTargets:
+    """Tests for explicit persisted target configuration management."""
+
+    async def test_create_persisted_target_stores_secret_reference(self, sqlite_instance) -> None:
         service = TargetService(api_key_vault_url="https://vault.vault.azure.net")
-        request = CreateTargetRequest(
-            type="OpenAIResponseTarget",
-            params={
-                "model_name": "model",
-                "endpoint": "https://example.test",
-                "api_key": "secret",
-            },
+        request = CreatePersistedTargetRequest(
+            display_name="My target",
+            model_name="model",
+            endpoint="https://example.test",
+            api_key="secret",
         )
         secret_uri = "https://vault.vault.azure.net/secrets/key/version"
 
@@ -488,24 +492,40 @@ class TestCreateTarget:
             "set_secret_async",
             new_callable=AsyncMock,
             return_value=secret_uri,
-        ):
-            result = await service.create_target_async(request=request)
+        ) as set_secret:
+            result = await service.create_persisted_target_async(request=request)
 
         configs = sqlite_instance.get_openai_target_configs()
-        assert len(configs) == 1
-        assert configs[0].target_registry_name == result.target_registry_name
+        assert configs == [result]
+        assert configs[0].display_name == "My target"
         assert configs[0].api_key_secret_uri == secret_uri
         assert "secret" not in configs[0].model_dump().values()
+        assert set_secret.call_args.kwargs == {
+            "name": f"pyrit-target-api-key-{result.id}",
+            "value": "secret",
+        }
 
-    async def test_create_api_key_target_does_not_persist_when_vault_write_fails(self, sqlite_instance) -> None:
+    async def test_create_persisted_target_requires_configured_vault(self, sqlite_instance) -> None:
+        service = TargetService()
+        request = CreatePersistedTargetRequest(
+            display_name="My target",
+            model_name="model",
+            endpoint="https://example.test",
+            api_key="secret",
+        )
+
+        with pytest.raises(ValueError, match="target_api_key_vault_url"):
+            await service.create_persisted_target_async(request=request)
+
+        assert sqlite_instance.get_openai_target_configs() == []
+
+    async def test_create_persisted_target_does_not_store_when_vault_write_fails(self, sqlite_instance) -> None:
         service = TargetService(api_key_vault_url="https://vault.vault.azure.net")
-        request = CreateTargetRequest(
-            type="OpenAIResponseTarget",
-            params={
-                "model_name": "model",
-                "endpoint": "https://example.test",
-                "api_key": "secret",
-            },
+        request = CreatePersistedTargetRequest(
+            display_name="My target",
+            model_name="model",
+            endpoint="https://example.test",
+            api_key="secret",
         )
 
         with (
@@ -517,10 +537,27 @@ class TestCreateTarget:
             ),
             pytest.raises(RuntimeError, match="vault unavailable"),
         ):
-            await service.create_target_async(request=request)
+            await service.create_persisted_target_async(request=request)
 
         assert sqlite_instance.get_openai_target_configs() == []
         assert len(service._registry.instances) == 0
+
+    async def test_list_and_delete_persisted_target(self, sqlite_instance) -> None:
+        service = TargetService()
+        created = await service.create_persisted_target_async(
+            request=CreatePersistedTargetRequest(
+                display_name="Identity target",
+                model_name="model",
+                endpoint="https://example.openai.azure.com",
+                auth_mode="identity",
+            )
+        )
+
+        assert (await service.list_persisted_targets_async()).items == [created]
+
+        await service.delete_persisted_target_async(target_id=created.id)
+
+        assert (await service.list_persisted_targets_async()).items == []
 
 
 class TestCreateTargetEntraAuth:

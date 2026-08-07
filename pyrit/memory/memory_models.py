@@ -427,7 +427,8 @@ class OpenAITargetConfigEntry(DomainBackedEntry[OpenAITargetConfig]):
     __tablename__ = "Targets"
     __table_args__ = {"extend_existing": True}
 
-    target_registry_name: Mapped[str] = mapped_column(String, primary_key=True)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     endpoint: Mapped[str] = mapped_column(String, nullable=False)
     model_name: Mapped[str] = mapped_column(String, nullable=False)
     auth_mode: Mapped[Literal["api_key", "identity"]] = mapped_column(String, nullable=False)
@@ -454,7 +455,8 @@ class OpenAITargetConfigEntry(DomainBackedEntry[OpenAITargetConfig]):
             OpenAITargetConfig: The reconstructed target configuration.
         """
         return OpenAITargetConfig(
-            target_registry_name=self.target_registry_name,
+            id=self.id,
+            display_name=self.display_name,
             endpoint=self.endpoint,
             model_name=self.model_name,
             auth_mode=self.auth_mode,

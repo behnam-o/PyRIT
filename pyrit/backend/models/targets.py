@@ -13,11 +13,13 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from pyrit.backend.models.common import PaginationInfo
-from pyrit.models import JSONValue, Parameter
+from pyrit.models import JSONValue, OpenAITargetConfig, Parameter
 from pyrit.models.catalog.target import TargetInstance
 
 __all__ = [
+    "CreatePersistedTargetRequest",
     "CreateTargetRequest",
+    "PersistedTargetListResponse",
     "TargetCatalogEntry",
     "TargetCatalogResponse",
     "TargetListResponse",
@@ -71,3 +73,19 @@ class CreateTargetRequest(BaseModel):
             "AzureBlobStorageTarget, and PromptShieldTarget."
         ),
     )
+
+
+class CreatePersistedTargetRequest(BaseModel):
+    """Request to persist an OpenAI Responses target configuration."""
+
+    display_name: str = Field(..., min_length=1, max_length=255)
+    endpoint: str = Field(..., min_length=1)
+    model_name: str = Field(..., min_length=1)
+    auth_mode: Literal["api_key", "identity"] = "api_key"
+    api_key: str | None = None
+
+
+class PersistedTargetListResponse(BaseModel):
+    """Response containing persisted OpenAI target configurations."""
+
+    items: list[OpenAITargetConfig]

@@ -8,6 +8,7 @@ import ChatWindow from './components/Chat/ChatWindow'
 import AttackNotFound from './components/Chat/AttackNotFound'
 import Home from './components/Home/Home'
 import TargetConfig from './components/Config/TargetConfig'
+import PersistedTargets from './components/Targets/PersistedTargets'
 import Initializers from './components/Initializers/Initializers'
 import AttackHistory from './components/History/AttackHistory'
 import FeedbackDialog from './components/Feedback/FeedbackDialog'
@@ -37,6 +38,7 @@ const VIEW_PATHS: Record<ViewName, string> = {
   chat: '/chat',
   history: '/history',
   config: '/config',
+  targets: '/targets/',
   initializers: '/initializers',
 }
 
@@ -399,6 +401,7 @@ function App() {
                   />
                 }
               />
+              <Route path="/targets/" element={<PersistedTargets />} />
               <Route path="/initializers" element={<Initializers />} />
               <Route
                 path="/history"

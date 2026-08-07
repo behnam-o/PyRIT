@@ -12,11 +12,14 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from pyrit.backend.models.common import ProblemDetail
 from pyrit.backend.models.targets import (
+    CreatePersistedTargetRequest,
     CreateTargetRequest,
+    PersistedTargetListResponse,
     TargetCatalogResponse,
     TargetListResponse,
 )
 from pyrit.backend.services.target_service import get_target_service
+from pyrit.models import OpenAITargetConfig
 from pyrit.models.catalog.target import TargetInstance
 
 router = APIRouter(prefix="/targets", tags=["targets"])
@@ -61,6 +64,44 @@ async def list_target_catalog() -> TargetCatalogResponse:  # pyrit-async-suffix-
     """
     service = get_target_service()
     return await service.list_target_catalog_async()
+
+
+@router.get("/persisted", response_model=PersistedTargetListResponse)
+async def list_persisted_targets() -> PersistedTargetListResponse:  # pyrit-async-suffix-exempt
+    """
+    List persisted OpenAI Responses target configurations.
+
+    Returns:
+        PersistedTargetListResponse: The stored target configurations.
+    """
+    return await get_target_service().list_persisted_targets_async()
+
+
+@router.post("/persisted", response_model=OpenAITargetConfig, status_code=status.HTTP_201_CREATED)
+async def create_persisted_target(  # pyrit-async-suffix-exempt
+    request: CreatePersistedTargetRequest,
+) -> OpenAITargetConfig:
+    """
+    Create a persisted OpenAI Responses target configuration.
+
+    Returns:
+        OpenAITargetConfig: The newly stored target configuration.
+    """
+    try:
+        return await get_target_service().create_persisted_target_async(request=request)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to persist target: {str(e)}",
+        ) from e
+
+
+@router.delete("/persisted/{target_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_persisted_target(target_id: str) -> None:  # pyrit-async-suffix-exempt
+    """Delete a persisted target configuration."""
+    await get_target_service().delete_persisted_target_async(target_id=target_id)
 
 
 @router.post(

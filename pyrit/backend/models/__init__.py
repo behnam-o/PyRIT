@@ -61,7 +61,9 @@ from pyrit.backend.models.scenarios import (
     ScenarioRunListResponse,
 )
 from pyrit.backend.models.targets import (
+    CreatePersistedTargetRequest,
     CreateTargetRequest,
+    PersistedTargetListResponse,
     TargetListResponse,
 )
 
@@ -115,6 +117,8 @@ __all__ = [
     "ListRegisteredInitializersResponse",
     "RegisterInitializerRequest",
     # Targets
+    "CreatePersistedTargetRequest",
     "CreateTargetRequest",
+    "PersistedTargetListResponse",
     "TargetListResponse",
 ]

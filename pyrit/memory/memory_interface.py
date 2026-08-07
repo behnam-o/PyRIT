@@ -241,8 +241,26 @@ class MemoryInterface(abc.ABC):
 
     def get_openai_target_configs(self) -> Sequence[OpenAITargetConfig]:
         """Return all persisted target configurations."""
-        entries = self._query_entries(OpenAITargetConfigEntry, order_by=OpenAITargetConfigEntry.target_registry_name)
+        entries = self._query_entries(OpenAITargetConfigEntry, order_by=OpenAITargetConfigEntry.display_name)
         return [entry.to_domain_model() for entry in entries]
+
+    def delete_openai_target_config(self, *, target_id: str) -> None:
+        """
+        Delete a persisted target configuration by id when it exists.
+
+        Raises:
+            SQLAlchemyError: If the delete operation fails.
+        """
+        with closing(self.get_session()) as session:
+            try:
+                session.query(OpenAITargetConfigEntry).filter(OpenAITargetConfigEntry.id == target_id).delete(
+                    synchronize_session=False
+                )
+                session.commit()
+            except SQLAlchemyError as e:
+                session.rollback()
+                logger.exception(f"Error deleting target configuration '{target_id}': {e}")
+                raise
 
     def disable_embedding(self) -> None:
         """

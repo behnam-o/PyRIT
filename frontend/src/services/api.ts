@@ -12,6 +12,9 @@ import type {
   ConverterInstance,
   ConverterListResponse,
   CreateTargetRequest,
+  CreatePersistedTargetRequest,
+  PersistedTarget,
+  PersistedTargetListResponse,
   InitializerSettingsResponse,
   ListRegisteredInitializersResponse,
   AdditionalInitializer,
@@ -169,6 +172,20 @@ export const targetsApi = {
   createTarget: async (request: CreateTargetRequest): Promise<TargetInstance> => {
     const response = await apiClient.post('/targets', request)
     return response.data
+  },
+
+  listPersistedTargets: async (): Promise<PersistedTargetListResponse> => {
+    const response = await apiClient.get('/targets/persisted')
+    return response.data
+  },
+
+  createPersistedTarget: async (request: CreatePersistedTargetRequest): Promise<PersistedTarget> => {
+    const response = await apiClient.post('/targets/persisted', request)
+    return response.data
+  },
+
+  deletePersistedTarget: async (targetId: string): Promise<void> => {
+    await apiClient.delete(`/targets/persisted/${encodeURIComponent(targetId)}`)
   },
 }
 

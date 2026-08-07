@@ -17,12 +17,15 @@ import logging
 import re
 from functools import lru_cache
 from typing import Any, Literal, cast
+from uuid import uuid4
 
 from pyrit.auth.key_vault_secret_store import KeyVaultSecretStore
 from pyrit.backend.mappers.target_mappers import target_object_to_instance
 from pyrit.backend.models.common import PaginationInfo
 from pyrit.backend.models.targets import (
+    CreatePersistedTargetRequest,
     CreateTargetRequest,
+    PersistedTargetListResponse,
     TargetCatalogEntry,
     TargetCatalogResponse,
     TargetListResponse,
@@ -77,7 +80,10 @@ class TargetService:
             TargetListResponse containing paginated targets.
         """
         items = [
-            self._build_instance_from_object(target_registry_name=entry.name, target_obj=entry.instance)
+            self._build_instance_from_object(
+                target_registry_name=entry.name,
+                target_obj=entry.instance,
+            )
             for entry in self._registry.instances.get_all_instances()
         ]
         page, has_more = self._paginate(items=items, cursor=cursor, limit=limit)
@@ -121,7 +127,10 @@ class TargetService:
         obj = self._registry.instances.get(target_registry_name)
         if obj is None:
             return None
-        return self._build_instance_from_object(target_registry_name=target_registry_name, target_obj=obj)
+        return self._build_instance_from_object(
+            target_registry_name=target_registry_name,
+            target_obj=obj,
+        )
 
     def get_target_object(self, *, target_registry_name: str) -> Any | None:
         """
@@ -196,35 +205,68 @@ class TargetService:
         target_obj = self._registry.create_instance(request.type, **params)
 
         target_registry_name = target_obj.get_identifier().unique_name
-        if request.type != "OpenAIResponseTarget":
-            self._registry.instances.register(target_obj, name=target_registry_name)
-            return self._build_instance_from_object(target_registry_name=target_registry_name, target_obj=target_obj)
+        self._registry.instances.register(target_obj, name=target_registry_name)
+        return self._build_instance_from_object(target_registry_name=target_registry_name, target_obj=target_obj)
 
-        secret_uri = await self._persist_api_key_async(
-            target_registry_name=target_registry_name,
-            api_key=cast("str | None", params.pop("api_key", None)),
+    async def list_persisted_targets_async(self) -> PersistedTargetListResponse:
+        """
+        List persisted OpenAI Responses target configurations.
+
+        Returns:
+            PersistedTargetListResponse: The stored target configurations.
+        """
+        memory = CentralMemory.get_memory_instance()
+        targets = await asyncio.to_thread(memory.get_openai_target_configs)
+        return PersistedTargetListResponse(items=list(targets))
+
+    async def create_persisted_target_async(
+        self, *, request: CreatePersistedTargetRequest
+    ) -> OpenAITargetConfig:
+        """
+        Persist and register an OpenAI Responses target configuration.
+
+        Returns:
+            OpenAITargetConfig: The stored target configuration.
+        """
+        if request.auth_mode == "api_key" and not request.api_key:
+            raise ValueError("API key authentication requires an api_key.")
+
+        target_obj = self._registry.create_instance(
+            "OpenAIResponseTarget",
+            endpoint=request.endpoint,
+            model_name=request.model_name,
+            **({"api_key": request.api_key} if request.auth_mode == "api_key" else {}),
         )
+        target_id = str(uuid4())
         persisted_target = OpenAITargetConfig(
-            target_registry_name=target_registry_name,
-            endpoint=cast("str", params["endpoint"]),
-            model_name=cast("str", params["model_name"]),
+            id=target_id,
+            display_name=request.display_name,
+            endpoint=request.endpoint,
+            model_name=request.model_name,
             auth_mode=request.auth_mode,
-            api_key_secret_uri=secret_uri,
+            api_key_secret_uri=await self._persist_api_key_async(
+                target_id=target_id,
+                api_key=request.api_key,
+            ),
         )
         memory = CentralMemory.get_memory_instance()
         await asyncio.to_thread(memory.add_openai_target_config, target=persisted_target)
-        self._registry.instances.register(target_obj, name=target_registry_name)
+        self._registry.instances.register(target_obj)
+        return persisted_target
 
-        return self._build_instance_from_object(target_registry_name=target_registry_name, target_obj=target_obj)
+    async def delete_persisted_target_async(self, *, target_id: str) -> None:
+        """Delete a persisted target configuration by id."""
+        memory = CentralMemory.get_memory_instance()
+        await asyncio.to_thread(memory.delete_openai_target_config, target_id=target_id)
 
-    async def _persist_api_key_async(self, *, target_registry_name: str, api_key: str | None) -> str | None:
+    async def _persist_api_key_async(self, *, target_id: str, api_key: str | None) -> str | None:
         if not api_key:
             return None
         if self._secret_store is None:
             raise ValueError(
                 "Target API key persistence requires 'target_api_key_vault_url' in the PyRIT configuration."
             )
-        secret_name = re.sub(r"[^0-9A-Za-z-]", "-", f"pyrit-target-{target_registry_name}")[:127]
+        secret_name = re.sub(r"[^0-9A-Za-z-]", "-", f"pyrit-target-api-key-{target_id}")[:127]
         return await self._secret_store.set_secret_async(name=secret_name, value=api_key)
 
 

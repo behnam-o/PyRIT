@@ -108,6 +108,27 @@ export interface CreateTargetRequest {
   auth_mode?: 'api_key' | 'identity'
 }
 
+export interface PersistedTarget {
+  id: string
+  display_name: string
+  endpoint: string
+  model_name: string
+  auth_mode: 'api_key' | 'identity'
+  api_key_secret_uri?: string | null
+}
+
+export interface PersistedTargetListResponse {
+  items: PersistedTarget[]
+}
+
+export interface CreatePersistedTargetRequest {
+  display_name: string
+  endpoint: string
+  model_name: string
+  auth_mode: 'api_key' | 'identity'
+  api_key?: string
+}
+
 // --- Initializers ---
 
 export interface RegisteredInitializer {

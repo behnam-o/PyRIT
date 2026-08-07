@@ -10,7 +10,7 @@ from pyrit.models import OpenAITargetConfig
 def test_api_key_auth_requires_secret_uri() -> None:
     with pytest.raises(ValidationError, match="api_key_secret_uri"):
         OpenAITargetConfig(
-            target_registry_name="target",
+            display_name="Target",
             endpoint="https://example.test",
             model_name="model",
             auth_mode="api_key",
@@ -20,7 +20,7 @@ def test_api_key_auth_requires_secret_uri() -> None:
 def test_identity_auth_rejects_secret_uri() -> None:
     with pytest.raises(ValidationError, match="must not reference"):
         OpenAITargetConfig(
-            target_registry_name="target",
+            display_name="Target",
             endpoint="https://example.test",
             model_name="model",
             auth_mode="identity",
