@@ -24,6 +24,16 @@ export const useTargetConfigStyles = makeStyles({
     display: 'flex',
     gap: tokens.spacingHorizontalS,
   },
+  tabList: {
+    marginBottom: tokens.spacingVerticalL,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke1}`,
+  },
+  pane: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+    minWidth: 0,
+  },
   emptyState: {
     display: 'flex',
     flexDirection: 'column',

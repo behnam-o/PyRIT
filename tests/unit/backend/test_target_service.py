@@ -352,7 +352,7 @@ class TestCreateTarget:
     async def test_create_api_key_target_requires_configured_vault(self, sqlite_instance) -> None:
         service = TargetService()
         request = CreateTargetRequest(
-            type="OpenAIChatTarget",
+            type="OpenAIResponseTarget",
             params={
                 "model_name": "model",
                 "endpoint": "https://example.test",
@@ -369,7 +369,7 @@ class TestCreateTarget:
     async def test_create_api_key_target_persists_secret_reference(self, sqlite_instance) -> None:
         service = TargetService(api_key_vault_url="https://vault.vault.azure.net")
         request = CreateTargetRequest(
-            type="OpenAIChatTarget",
+            type="OpenAIResponseTarget",
             params={
                 "model_name": "model",
                 "endpoint": "https://example.test",
@@ -395,7 +395,7 @@ class TestCreateTarget:
     async def test_create_api_key_target_does_not_persist_when_vault_write_fails(self, sqlite_instance) -> None:
         service = TargetService(api_key_vault_url="https://vault.vault.azure.net")
         request = CreateTargetRequest(
-            type="OpenAIChatTarget",
+            type="OpenAIResponseTarget",
             params={
                 "model_name": "model",
                 "endpoint": "https://example.test",

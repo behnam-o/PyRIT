@@ -4,6 +4,7 @@
 from unittest.mock import AsyncMock, patch
 
 from pyrit.models import OpenAITargetConfig
+from pyrit.prompt_target import OpenAIResponseTarget
 from pyrit.registry import TargetRegistry
 from pyrit.setup.initializers.dbtargets import DbtargetsInitializer
 
@@ -26,7 +27,7 @@ async def test_initialize_registers_api_key_target(sqlite_instance) -> None:
         await DbtargetsInitializer().initialize_async()
 
     target = TargetRegistry.get_registry_singleton().instances.get("saved-target")
-    assert target is not None
+    assert isinstance(target, OpenAIResponseTarget)
     assert target._api_key == "secret-value"
     get_secret.assert_awaited_once()
 
@@ -48,4 +49,5 @@ async def test_initialize_registers_identity_target(sqlite_instance) -> None:
     ):
         await DbtargetsInitializer().initialize_async()
 
-    assert TargetRegistry.get_registry_singleton().instances.get("identity-target") is not None
+    target = TargetRegistry.get_registry_singleton().instances.get("identity-target")
+    assert isinstance(target, OpenAIResponseTarget)

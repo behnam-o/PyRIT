@@ -109,6 +109,7 @@ interface CreateTargetDialogProps {
   onCreated: () => void
   /** Existing targets, passed from the parent to avoid a redundant API call. */
   existingTargets?: TargetInstance[]
+  initialTargetType?: string
 }
 
 /** State for one selected inner target in the RoundRobinTarget form. */
@@ -162,9 +163,15 @@ function isCompatible(a: TargetInstance, b: TargetInstance): boolean {
   )
 }
 
-export default function CreateTargetDialog({ open, onClose, onCreated, existingTargets }: CreateTargetDialogProps) {
+export default function CreateTargetDialog({
+  open,
+  onClose,
+  onCreated,
+  existingTargets,
+  initialTargetType,
+}: CreateTargetDialogProps) {
   const styles = useCreateTargetDialogStyles()
-  const [targetType, setTargetType] = useState('')
+  const [targetType, setTargetType] = useState(initialTargetType ?? '')
   const [endpoint, setEndpoint] = useState('')
   const [modelName, setModelName] = useState('')
   const [hasDifferentUnderlying, setHasDifferentUnderlying] = useState(false)
@@ -316,7 +323,7 @@ export default function CreateTargetDialog({ open, onClose, onCreated, existingT
   }
 
   const resetForm = () => {
-    setTargetType('')
+    setTargetType(initialTargetType ?? '')
     setEndpoint('')
     setModelName('')
     setHasDifferentUnderlying(false)

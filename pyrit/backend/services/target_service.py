@@ -207,7 +207,7 @@ class TargetService:
             target_obj = target_cls(**params)
 
         target_registry_name = target_obj.get_identifier().unique_name
-        if request.type != "OpenAIChatTarget":
+        if request.type != "OpenAIResponseTarget":
             self._registry.instances.register(target_obj, name=target_registry_name)
             return self._build_instance_from_object(target_registry_name=target_registry_name, target_obj=target_obj)
 
