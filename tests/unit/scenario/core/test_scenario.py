@@ -16,7 +16,7 @@ except ImportError:  # pragma: no cover - 3.10 only
 
 from pyrit.executor.attack.core import AttackExecutorResult
 from pyrit.memory import CentralMemory
-from pyrit.models import AttackOutcome, AttackResult, ComponentIdentifier
+from pyrit.models import AttackOutcome, AttackResult, ComponentIdentifier, ScenarioRunState
 from pyrit.scenario import (
     DatasetAttackConfiguration,
     DatasetConfiguration,
@@ -24,6 +24,7 @@ from pyrit.scenario import (
     ScenarioResult,
 )
 from pyrit.scenario.core import AtomicAttack, BaselineAttackPolicy, Scenario, ScenarioTechnique
+from pyrit.scenario.core.matrix_atomic_attack_builder import build_baseline_atomic_attack
 from pyrit.scenario.core.scenario_context import ScenarioContext
 from pyrit.score import Scorer
 from tests.unit.mocks import make_scenario_identifier, make_scenario_result
@@ -157,7 +158,6 @@ class ConcreteScenario(Scenario):
                 return {"all"}
 
         kwargs.setdefault("technique_class", TestTechnique)
-        kwargs.setdefault("default_technique", kwargs["technique_class"].ALL)
         kwargs.setdefault("default_dataset_config", DatasetConfiguration())
 
         # Add a mock scorer if not provided
@@ -773,7 +773,6 @@ class ConcreteScenarioWithTrueFalseScorer(Scenario):
                 return {"all"}
 
         kwargs.setdefault("technique_class", TestTechnique)
-        kwargs.setdefault("default_technique", kwargs["technique_class"].ALL)
         kwargs.setdefault("default_dataset_config", DatasetConfiguration())
 
         # Use TrueFalseScorer mock if not provided
@@ -787,7 +786,18 @@ class ConcreteScenarioWithTrueFalseScorer(Scenario):
         return await self._dataset_config.get_attack_groups_by_dataset_async(apply_sampling=apply_sampling)
 
     async def _build_atomic_attacks_async(self, *, context):
-        return list(self._atomic_attacks_to_return)
+        atomic_attacks = list(self._atomic_attacks_to_return)
+        if context.include_baseline and self._objective_target is not None and context.seed_groups:
+            atomic_attacks.insert(
+                0,
+                build_baseline_atomic_attack(
+                    objective_target=context.objective_target,
+                    objective_scorer=self._objective_scorer,
+                    seed_groups=list(context.seed_groups),
+                    memory_labels=context.memory_labels,
+                ),
+            )
+        return atomic_attacks
 
 
 @pytest.mark.usefixtures("patch_central_database")
@@ -888,6 +898,13 @@ class TestScenarioBaselineOnlyExecution:
         # But running should fail because there are no atomic attacks
         with pytest.raises(ValueError, match="Cannot run scenario with no atomic attacks"):
             await scenario.run_async()
+
+        scenario_results = CentralMemory.get_memory_instance().get_scenario_results(
+            scenario_result_ids=[scenario._scenario_result_id]
+        )
+        assert scenario_results[0].scenario_run_state == ScenarioRunState.FAILED
+        assert scenario_results[0].error_type == "ValueError"
+        assert "Cannot run scenario with no atomic attacks" in scenario_results[0].error_message
 
     async def test_standalone_baseline_uses_dataset_config_seeds(self, mock_objective_target):
         """Test that standalone baseline uses seed groups from dataset_config."""
@@ -1012,13 +1029,24 @@ class TestScenarioBaselineUniformObjectives:
 
         class TechniqueScenario(ConcreteScenarioWithTrueFalseScorer):
             async def _build_atomic_attacks_async(self, *, context):
-                return [
+                attacks = []
+                if context.include_baseline:
+                    attacks.append(
+                        build_baseline_atomic_attack(
+                            objective_target=context.objective_target,
+                            objective_scorer=self._objective_scorer,
+                            seed_groups=list(context.seed_groups),
+                            memory_labels=context.memory_labels,
+                        )
+                    )
+                attacks.append(
                     AtomicAttack(
                         atomic_attack_name="technique",
                         attack_technique=AttackTechnique(attack=MagicMock()),
                         seed_groups=list(context.seed_groups),
                     )
-                ]
+                )
+                return attacks
 
         # A single deterministic resolution: random.sample must be called exactly once,
         # so baseline and technique draw from the same sampled population and share objectives.
@@ -1065,26 +1093,48 @@ class TestScenarioResumeDeterministicUnderMaxDatasetSize:
         async def _build_atomic_attacks_async(self, *, context):
             from pyrit.scenario.core.attack_technique import AttackTechnique
 
-            return [
+            attacks = []
+            if context.include_baseline:
+                attacks.append(
+                    build_baseline_atomic_attack(
+                        objective_target=context.objective_target,
+                        objective_scorer=self._objective_scorer,
+                        seed_groups=list(context.seed_groups),
+                        memory_labels=context.memory_labels,
+                    )
+                )
+            attacks.append(
                 AtomicAttack(
                     atomic_attack_name="strategy",
                     attack_technique=AttackTechnique(attack=MagicMock()),
                     seed_groups=list(context.seed_groups),
                 )
-            ]
+            )
+            return attacks
 
     class _PerObjectiveScenario(ConcreteScenarioWithTrueFalseScorer):
         async def _build_atomic_attacks_async(self, *, context: ScenarioContext) -> list[AtomicAttack]:
             from pyrit.scenario.core.attack_technique import AttackTechnique
 
-            return [
+            attacks: list[AtomicAttack] = []
+            if context.include_baseline:
+                attacks.append(
+                    build_baseline_atomic_attack(
+                        objective_target=context.objective_target,
+                        objective_scorer=self._objective_scorer,
+                        seed_groups=list(context.seed_groups),
+                        memory_labels=context.memory_labels,
+                    )
+                )
+            attacks.extend(
                 AtomicAttack(
                     atomic_attack_name=f"strategy-{index}",
                     attack_technique=AttackTechnique(attack=MagicMock()),
                     seed_groups=[seed_group],
                 )
                 for index, seed_group in enumerate(context.seed_groups)
-            ]
+            )
+            return attacks
 
     def _make_config(self):
         from pyrit.models import SeedGroup, SeedObjective
@@ -1216,44 +1266,6 @@ class TestScenarioResumeDeterministicUnderMaxDatasetSize:
         assert sample_mock.call_count == 1
         _, strategy = scenario._atomic_attacks
         assert len(strategy.objectives) == 3
-
-
-@pytest.mark.usefixtures("patch_central_database")
-class TestBuildBaselineAtomicAttack:
-    """Unit tests for Scenario._build_baseline_atomic_attack."""
-
-    def _seed_groups(self):
-        from pyrit.models import AttackSeedGroup, SeedObjective
-
-        return [AttackSeedGroup(seeds=[SeedObjective(value="x")])]
-
-    def test_returns_baseline_atomic_attack(self, mock_objective_target):
-        from pyrit.executor.attack.single_turn.prompt_sending import PromptSendingAttack
-
-        seed_groups = self._seed_groups()
-        scenario = ConcreteScenarioWithTrueFalseScorer(name="T", version=1)
-        scenario._objective_target = mock_objective_target
-
-        atomic = scenario._build_baseline_atomic_attack(seed_groups=seed_groups)
-
-        assert atomic.atomic_attack_name == "baseline"
-        assert atomic.seed_groups == seed_groups
-        assert isinstance(atomic.attack_technique.attack, PromptSendingAttack)
-
-    def test_raises_when_target_is_none(self):
-        scenario = ConcreteScenarioWithTrueFalseScorer(name="T", version=1)
-        # _objective_target is None pre-initialize_async
-
-        with pytest.raises(ValueError, match="Objective target is required"):
-            scenario._build_baseline_atomic_attack(seed_groups=self._seed_groups())
-
-    def test_raises_when_scorer_is_none(self, mock_objective_target):
-        scenario = ConcreteScenarioWithTrueFalseScorer(name="T", version=1)
-        scenario._objective_target = mock_objective_target
-        scenario._objective_scorer = None  # type: ignore[assignment]
-
-        with pytest.raises(ValueError, match="Objective scorer is required"):
-            scenario._build_baseline_atomic_attack(seed_groups=self._seed_groups())
 
 
 @pytest.mark.usefixtures("patch_central_database")

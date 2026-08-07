@@ -5,7 +5,7 @@
 Add persisted target configurations.
 
 Revision ID: 4a7c9e1b3d5f
-Revises: 3f6e8a0c2d4b
+Revises: 4c9a6e1f2b7d
 Create Date: 2026-07-17 00:00:00.000000
 """
 
@@ -16,7 +16,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "4a7c9e1b3d5f"
-down_revision: str | None = "3f6e8a0c2d4b"
+down_revision: str | None = "4c9a6e1f2b7d"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

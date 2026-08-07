@@ -28,7 +28,8 @@ from tqdm.auto import tqdm
 
 from pyrit.common import get_global_default_values
 from pyrit.common.utils import to_sha256
-from pyrit.executor.attack import AttackExecutor
+from pyrit.exceptions import ScenarioPartialFailureException
+from pyrit.executor.attack import AttackExecutor, AttackExecutorResult
 from pyrit.memory import CentralMemory
 from pyrit.memory.memory_models import ScenarioResultEntry
 from pyrit.models import (
@@ -47,7 +48,6 @@ from pyrit.registry import ScorerRegistry
 from pyrit.registry.resolution import resolve_declared_params, resolve_reference_value
 from pyrit.scenario.core.atomic_attack import AtomicAttack
 from pyrit.scenario.core.dataset_configuration import DatasetAttackConfiguration
-from pyrit.scenario.core.matrix_atomic_attack_builder import build_baseline_atomic_attack
 from pyrit.scenario.core.scenario_context import ScenarioContext
 from pyrit.scenario.core.scenario_target_defaults import get_default_scorer_target
 from pyrit.scenario.core.scenario_technique import ScenarioTechnique
@@ -153,7 +153,6 @@ class Scenario(ABC):
         name: str = "",
         version: int,
         technique_class: type[ScenarioTechnique],
-        default_technique: ScenarioTechnique,
         default_dataset_config: DatasetAttackConfiguration,
         objective_scorer: Scorer,
         scenario_result_id: uuid.UUID | str | None = None,
@@ -165,9 +164,9 @@ class Scenario(ABC):
             name (str): Descriptive name for the scenario.
             version (int): Version number of the scenario.
             technique_class (type[ScenarioTechnique]): The technique enum class for this scenario.
-            default_technique (ScenarioTechnique): The default technique member used when no
-                ``scenario_techniques`` are passed to ``initialize_async``. Usually an aggregate
-                member like ``MyTechnique.ALL`` or ``MyTechnique.DEFAULT``.
+                The technique used when no ``scenario_techniques`` are passed to
+                ``initialize_async`` is the catalog's own default, read from
+                ``technique_class.default()``.
             default_dataset_config (DatasetAttackConfiguration): The default dataset configuration used
                 when no ``dataset_config`` is passed to ``initialize_async``.
             objective_scorer (Scorer): The objective scorer used to evaluate attack results.
@@ -197,7 +196,7 @@ class Scenario(ABC):
 
         # Store technique configuration for use in initialize_async
         self._technique_class = technique_class
-        self._default_technique = default_technique
+        self._default_technique = technique_class.default()
         self._default_dataset_config = default_dataset_config
 
         # These will be set in initialize_async
@@ -609,9 +608,12 @@ class Scenario(ABC):
         self._technique_converters = params.get("technique_converters") or {}
 
         # Build atomic attacks: resolve the seed groups once, snapshot the resolved inputs
-        # into a ScenarioContext, and hand it to the subclass extension point. Baseline is
-        # emitted centrally (from context.seed_groups) so overrides never re-resolve seeds
-        # or hand-roll baseline emission.
+        # into a ScenarioContext, and hand it to the subclass extension point. Baseline emission
+        # is the scenario's own responsibility — matrix scenarios get it for free (the matrix
+        # builder reads ``context.include_baseline``); other scenarios prepend one via
+        # ``build_baseline_atomic_attack``. The base only resolves the policy into
+        # ``self._include_baseline`` above, which the ScenarioContext carries as
+        # ``include_baseline``.
         #
         # On resume, resolve the full, deterministic dataset (no max_dataset_size sampling):
         # the originally-sampled subset was snapshotted into the ScenarioResult metadata and is
@@ -621,9 +623,6 @@ class Scenario(ABC):
         seed_groups_by_dataset = await self._resolve_seed_groups_by_dataset_async(apply_sampling=not is_resume)
         context = self._build_scenario_context(seed_groups_by_dataset=seed_groups_by_dataset)
         self._atomic_attacks = await self._build_atomic_attacks_async(context=context)
-
-        if include_baseline and (not self._atomic_attacks or self._atomic_attacks[0].atomic_attack_name != "baseline"):
-            self._atomic_attacks.insert(0, self._build_baseline_atomic_attack(seed_groups=list(context.seed_groups)))
 
         # Build the canonical scenario identifier once params/techniques/datasets
         # are resolved, so both the resume check and the new-result branch share the
@@ -642,7 +641,10 @@ class Scenario(ABC):
                     f"Drop scenario_result_id to start a new scenario."
                 )
 
-            self._validate_stored_scenario(stored_result=existing_results[0], current_identifier=scenario_identifier)
+            self._validate_stored_scenario(
+                stored_result=existing_results[0],
+                current_identifier=scenario_identifier,
+            )
             self._apply_persisted_objectives(stored_result=existing_results[0])
             return  # Valid resume - skip creating new scenario result
 
@@ -744,36 +746,6 @@ class Scenario(ABC):
             )
 
         self._atomic_attacks = retained_attacks
-
-    def _build_baseline_atomic_attack(self, *, seed_groups: list[AttackSeedGroup]) -> AtomicAttack:
-        """
-        Build the baseline AtomicAttack from pre-resolved seed groups.
-
-        The baseline sends each objective unmodified, providing a comparison point
-        against the scenario's technique attacks. Pass the same ``seed_groups`` used
-        to build the technique attacks so both populations match.
-
-        Args:
-            seed_groups: Seed groups to attack. Used as-is, no further sampling.
-
-        Returns:
-            AtomicAttack: The baseline atomic attack.
-
-        Raises:
-            ValueError: If ``initialize_async`` has not been called (no objective
-                target or scorer set).
-        """
-        if self._objective_target is None:
-            raise ValueError("Objective target is required to create baseline attack.")
-        if self._objective_scorer is None:
-            raise ValueError("Objective scorer is required to create baseline attack.")
-
-        return build_baseline_atomic_attack(
-            objective_target=self._objective_target,
-            objective_scorer=self._objective_scorer,
-            seed_groups=seed_groups,
-            memory_labels=self._memory_labels,
-        )
 
     def _build_scenario_identifier(self) -> ScenarioIdentifier:
         """
@@ -1016,8 +988,9 @@ class Scenario(ABC):
 
         Scenario authors build their attacks from ``context.seed_groups`` (or
         ``context.seed_groups_by_dataset``) so sampling under ``max_dataset_size`` stays
-        consistent across every atomic attack and the baseline. The base owns baseline
-        emission, so overrides never prepend one themselves.
+        consistent across every atomic attack and the baseline. Each scenario emits its own
+        baseline here when ``context.include_baseline`` is set -- matrix scenarios via
+        ``build_matrix_atomic_attacks``, hand-built scenarios via ``build_baseline_atomic_attack``.
 
         Args:
             context (ScenarioContext): The resolved runtime inputs for this run.
@@ -1047,7 +1020,7 @@ class Scenario(ABC):
         Raises:
             ValueError: If the scenario has no atomic attacks configured. If your scenario
                 requires initialization, call await scenario.initialize() first.
-            ValueError: If the scenario raises an exception after exhausting all retry attempts.
+            ScenarioPartialFailureException: If an atomic attack only partially completes.
             RuntimeError: If the scenario fails for any other reason while executing.
 
         Example:
@@ -1056,10 +1029,13 @@ class Scenario(ABC):
             >>> print(f"Total results: {len(result.attack_results)}")
         """
         if not self._atomic_attacks:
-            raise ValueError(
+            error = ValueError(
                 "Cannot run scenario with no atomic attacks. Either supply them in initialization or "
                 "call await scenario.initialize_async() first."
             )
+            if self._scenario_result_id:
+                self._mark_scenario_failed(scenario_result_id=self._scenario_result_id, error=error)
+            raise error
 
         if not self._scenario_result_id:
             raise ValueError("Scenario not properly initialized. Call await scenario.initialize_async() first.")
@@ -1096,6 +1072,7 @@ class Scenario(ABC):
                     f"(initial + {self._max_retries} retries) with error: {str(e)}. Giving up.",
                     exc_info=True,
                 )
+                self._mark_scenario_failed(scenario_result_id=scenario_result_id, error=e)
                 raise
 
         # This should never be reached, but just in case
@@ -1117,7 +1094,7 @@ class Scenario(ABC):
         Raises:
             Exception: Any exception that occurs during scenario execution.
             ValueError: If a lookup for a scenario for a given ID fails.
-            ValueError: If atomic attack execution fails.
+            ScenarioPartialFailureException: If an atomic attack only partially completes.
         """
         logger.info(f"Starting scenario '{self._name}' execution with {len(self._atomic_attacks)} atomic attacks")
 
@@ -1138,6 +1115,12 @@ class Scenario(ABC):
         else:
             raise ValueError(f"Scenario result with ID {scenario_result_id} not found")
 
+        # Mark scenario as in progress
+        self._memory.update_scenario_run_state(
+            scenario_result_id=scenario_result_id,
+            scenario_run_state=ScenarioRunState.IN_PROGRESS,
+        )
+
         # Get remaining atomic attacks (filters out completed ones and updates objectives)
         remaining_attacks = await self._get_remaining_atomic_attacks_async()
 
@@ -1145,7 +1128,8 @@ class Scenario(ABC):
             logger.info(f"Scenario '{self._name}' has no remaining objectives to execute")
             # Mark scenario as completed
             self._memory.update_scenario_run_state(
-                scenario_result_id=scenario_result_id, scenario_run_state="COMPLETED"
+                scenario_result_id=scenario_result_id,
+                scenario_run_state=ScenarioRunState.COMPLETED,
             )
             # Retrieve and return the current scenario result
             scenario_results = self._memory.get_scenario_results(scenario_result_ids=[scenario_result_id])
@@ -1157,9 +1141,6 @@ class Scenario(ABC):
             f"Scenario '{self._name}' has {len(remaining_attacks)} atomic attacks "
             f"with remaining objectives (out of {len(self._atomic_attacks)} total)"
         )
-
-        # Mark scenario as in progress
-        self._memory.update_scenario_run_state(scenario_result_id=scenario_result_id, scenario_run_state="IN_PROGRESS")
 
         # Calculate starting index based on completed attacks
         completed_count = len(self._atomic_attacks) - len(remaining_attacks)
@@ -1181,7 +1162,8 @@ class Scenario(ABC):
 
             # Mark scenario as completed
             self._memory.update_scenario_run_state(
-                scenario_result_id=scenario_result_id, scenario_run_state="COMPLETED"
+                scenario_result_id=scenario_result_id,
+                scenario_run_state=ScenarioRunState.COMPLETED,
             )
 
             # Retrieve and return final scenario result
@@ -1199,15 +1181,15 @@ class Scenario(ABC):
         self,
         *,
         atomic_attack: AtomicAttack,
-        atomic_results: Any,
-    ) -> ValueError | None:
+        atomic_results: AttackExecutorResult[AttackResult],
+    ) -> ScenarioPartialFailureException | None:
         """
         Log the outcome of an atomic attack and return an exception if it didn't
         fully complete.
 
         Returns:
-            ValueError | None: An error to raise when the atomic attack has incomplete
-            objectives, otherwise ``None`` when all objectives finished successfully.
+            ScenarioPartialFailureException | None: An error to raise when the atomic attack
+                has incomplete objectives, otherwise ``None``.
         """
         if not atomic_results.has_incomplete:
             logger.info(
@@ -1225,24 +1207,22 @@ class Scenario(ABC):
         for obj, exc in atomic_results.incomplete_objectives:
             logger.error(f"  Incomplete objective '{obj[:50]}...': {str(exc)}")
 
-        inner = atomic_results.incomplete_objectives[0][1]
-        error = ValueError(
-            f"Atomic attack '{atomic_attack.atomic_attack_name}' partially failed: "
-            f"{incomplete_count} of {incomplete_count + completed_in_run} objectives incomplete. "
-            f"See attack results for details."
+        return ScenarioPartialFailureException(
+            atomic_attack_name=atomic_attack.atomic_attack_name,
+            completed_count=completed_in_run,
+            incomplete_objectives=atomic_results.incomplete_objectives,
         )
-        if isinstance(inner, BaseException):
-            error.__cause__ = inner
-        return error
 
     def _mark_scenario_failed(self, *, scenario_result_id: str, error: BaseException) -> None:
         """Mark the scenario run as FAILED, deriving message/type from ``error``."""
-        cause = error.__cause__ if error.__cause__ is not None else error
+        error_message = str(error)
+        if error.__cause__ is not None:
+            error_message = f"{error_message} Caused by {type(error.__cause__).__name__}: {str(error.__cause__)}"
         self._memory.update_scenario_run_state(
             scenario_result_id=scenario_result_id,
-            scenario_run_state="FAILED",
-            error_message=str(error),
-            error_type=type(cause).__name__,
+            scenario_run_state=ScenarioRunState.FAILED,
+            error_message=error_message,
+            error_type=type(error).__name__,
         )
 
     async def _execute_atomic_attacks_parallel_async(
@@ -1294,7 +1274,7 @@ class Scenario(ABC):
             queue.put_nowait(atomic_attack)
 
         stop_event = asyncio.Event()
-        outcomes: list[tuple[AtomicAttack, Any] | BaseException] = []
+        outcomes: list[tuple[AtomicAttack, AttackExecutorResult[AttackResult]] | BaseException] = []
 
         async def worker_async() -> None:
             while not stop_event.is_set():
@@ -1336,13 +1316,12 @@ class Scenario(ABC):
                 if len(errors) == 1
                 else ExceptionGroup(f"Multiple atomic attacks failed in scenario '{self._name}'", errors)
             )
-            self._mark_scenario_failed(scenario_result_id=scenario_result_id, error=final_error)
             raise final_error
 
     def _collect_errors_from_outcomes(
         self,
         *,
-        outcomes: list[tuple[AtomicAttack, Any] | BaseException],
+        outcomes: list[tuple[AtomicAttack, AttackExecutorResult[AttackResult]] | BaseException],
     ) -> list[BaseException]:
         """
         Convert worker outcomes into a flat list of errors for the caller to raise.
@@ -1351,8 +1330,7 @@ class Scenario(ABC):
             - ``BaseException``: the atomic attack raised; log and surface as-is.
             - ``(AtomicAttack, result)``: ran to completion. If the result reports
               incomplete objectives, ``_partial_result_to_exception`` produces a
-              synthetic ``ValueError`` so partial failures are surfaced the same
-              way as raised exceptions.
+              ``ScenarioPartialFailureException``.
 
         Returns:
             list[BaseException]: One exception per failed atomic attack, preserving

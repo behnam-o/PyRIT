@@ -50,24 +50,23 @@ def _make_attack_result(
     *,
     conversation_id: str = "attack-1",
     has_target: bool = True,
+    target_identifier: ComponentIdentifier | None = None,
     name: str = "Test Attack",
     outcome: AttackOutcome = AttackOutcome.UNDETERMINED,
 ) -> AttackResult:
     """Create an AttackResult for mapper tests."""
     now = datetime.now(timezone.utc)
 
-    target_identifier = (
-        ComponentIdentifier(
+    effective_target_identifier = None
+    if has_target:
+        effective_target_identifier = target_identifier or ComponentIdentifier(
             class_name="TextTarget",
             class_module="pyrit.prompt_target",
         )
-        if has_target
-        else None
-    )
 
     children = {}
-    if target_identifier:
-        children["objective_target"] = target_identifier
+    if effective_target_identifier:
+        children["objective_target"] = effective_target_identifier
 
     return AttackResult(
         conversation_id=conversation_id,
@@ -156,6 +155,36 @@ class TestAttackResultToSummary:
         assert summary.attack_type == "My Attack"
         assert summary.target is not None
         assert summary.target.target_type == "TextTarget"
+
+    async def test_round_robin_target_includes_canonical_identifier_hash(self) -> None:
+        """Composite targets retain their full identity even when root display fields are absent."""
+        target_identifier = ComponentIdentifier(
+            class_name="RoundRobinTarget",
+            class_module="pyrit.prompt_target.round_robin_target",
+            params={"weights": [1, 1]},
+            children={
+                "targets": [
+                    ComponentIdentifier(
+                        class_name="TextTarget",
+                        class_module="pyrit.prompt_target",
+                        params={"model_name": "e2e-dummy-model"},
+                    ),
+                    ComponentIdentifier(
+                        class_name="TextTarget",
+                        class_module="pyrit.prompt_target",
+                        params={"model_name": "e2e-dummy-model"},
+                    ),
+                ]
+            },
+        )
+        ar = _make_attack_result(target_identifier=target_identifier)
+
+        summary = await attack_result_to_summary_async(ar, stats=ConversationStats(message_count=0))
+
+        assert summary.target is not None
+        assert summary.target.target_type == "RoundRobinTarget"
+        assert summary.target.model_name is None
+        assert summary.target.identifier_hash == target_identifier.hash
 
     async def test_empty_pieces_gives_zero_messages(self) -> None:
         """Test mapping with no message pieces."""
@@ -386,6 +415,22 @@ class TestAttackResultToSummary:
         summary = await attack_result_to_summary_async(ar, stats=ConversationStats(message_count=0))
 
         assert summary.created_at == metadata_ts
+
+    async def test_updated_at_uses_ar_timestamp_ignoring_metadata_updated_at(self) -> None:
+        """``updated_at`` is the persisted ``ar.timestamp``; a stale ``metadata['updated_at']`` is ignored."""
+        ar_ts = datetime(2026, 4, 17, 12, 0, 0, tzinfo=timezone.utc)
+        stale = datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        ar = AttackResult(
+            conversation_id="attack-1",
+            objective="test",
+            outcome=AttackOutcome.SUCCESS,
+            timestamp=ar_ts,
+            metadata={"created_at": stale.isoformat(), "updated_at": stale.isoformat()},
+        )
+        summary = await attack_result_to_summary_async(ar, stats=ConversationStats(message_count=0))
+
+        assert summary.updated_at == ar_ts
+        assert summary.created_at == stale
 
     async def test_created_at_falls_back_to_now_when_both_absent(self) -> None:
         """When neither metadata nor ar.timestamp is set, fall back to datetime.now()."""

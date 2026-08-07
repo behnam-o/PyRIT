@@ -44,7 +44,7 @@ async def test_initialize_registers_identity_target(sqlite_instance) -> None:
 
     token_provider = AsyncMock(return_value="token")
     with patch(
-        "pyrit.prompt_target.openai.openai_target.get_azure_openai_auth",
+        "pyrit.auth.openai_auth.get_azure_openai_auth",
         return_value=token_provider,
     ):
         await DbtargetsInitializer().initialize_async()

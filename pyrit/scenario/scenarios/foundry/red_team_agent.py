@@ -10,9 +10,11 @@ available attacks against specified datasets.
 """
 
 import logging
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from inspect import signature
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
 
 from pyrit.common import apply_defaults
 from pyrit.converter import (
@@ -40,7 +42,13 @@ from pyrit.converter import (
 from pyrit.converter.binary_converter import BinaryConverter
 from pyrit.converter.token_smuggling.ascii_smuggler_converter import AsciiSmugglerConverter
 from pyrit.datasets import TextJailBreak
-from pyrit.executor.attack import CrescendoAttack, PromptSendingAttack, RedTeamingAttack, TreeOfAttacksWithPruningAttack
+from pyrit.executor.attack import (
+    AttackStrategy,
+    CrescendoAttack,
+    PromptSendingAttack,
+    RedTeamingAttack,
+    TreeOfAttacksWithPruningAttack,
+)
 from pyrit.executor.attack.core.attack_config import AttackAdversarialConfig, AttackConverterConfig, AttackScoringConfig
 from pyrit.models import AttackSeedGroup
 from pyrit.prompt_normalizer.converter_configuration import ConverterConfiguration
@@ -48,6 +56,7 @@ from pyrit.prompt_target import PromptTarget
 from pyrit.scenario.core.atomic_attack import AtomicAttack
 from pyrit.scenario.core.attack_technique import AttackTechnique
 from pyrit.scenario.core.dataset_configuration import DatasetAttackConfiguration
+from pyrit.scenario.core.matrix_atomic_attack_builder import build_baseline_atomic_attack
 from pyrit.scenario.core.scenario import Scenario
 from pyrit.scenario.core.scenario_context import ScenarioContext
 from pyrit.scenario.core.scenario_target_defaults import get_default_adversarial_target
@@ -55,8 +64,6 @@ from pyrit.scenario.core.scenario_technique import ScenarioTechnique
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-    from pyrit.executor.attack.core.attack_strategy import AttackStrategy
 
 AttackStrategyT = TypeVar("AttackStrategyT", bound="AttackStrategy[Any, Any]")
 logger = logging.getLogger(__name__)
@@ -186,6 +193,45 @@ class FoundryTechnique(ScenarioTechnique):
         # Include base class aggregates ("all") and add Foundry-specific ones
         return super().get_aggregate_tags() | {"easy", "moderate", "difficult", "converter", "attack"}
 
+    @classmethod
+    def default(cls) -> "FoundryTechnique":
+        """Return the default technique (``EASY``) used when the caller selects nothing."""
+        return cls.EASY
+
+
+@dataclass(frozen=True)
+class _AttackSpecification:
+    """Declarative construction details for a Foundry attack technique."""
+
+    attack_type: type[AttackStrategy[Any, Any]]
+    kwargs: tuple[tuple[str, Any], ...] = ()
+
+
+@dataclass(frozen=True)
+class _ConverterSpecification:
+    """Declarative construction details for a Foundry converter technique."""
+
+    factory: Callable[..., Converter]
+    kwargs: tuple[tuple[str, Any], ...] = ()
+    deferred_kwargs: tuple[tuple[str, Callable[[], Any]], ...] = ()
+    target_kwarg: str | None = None
+
+    def create(self, *, converter_target: PromptTarget) -> Converter:
+        """
+        Create a fresh converter from this specification.
+
+        Args:
+            converter_target (PromptTarget): Target supplied to converters that require one.
+
+        Returns:
+            Converter: The configured converter instance.
+        """
+        kwargs = dict(self.kwargs)
+        kwargs.update((name, factory()) for name, factory in self.deferred_kwargs)
+        if self.target_kwarg:
+            kwargs[self.target_kwarg] = converter_target
+        return self.factory(**kwargs)
+
 
 class RedTeamAgent(Scenario):
     """
@@ -202,6 +248,56 @@ class RedTeamAgent(Scenario):
     """
 
     VERSION: int = 1
+    _DEFAULT_ATTACK_SPECIFICATION: ClassVar[_AttackSpecification] = _AttackSpecification(PromptSendingAttack)
+    _ATTACK_SPECIFICATIONS: ClassVar[Mapping[FoundryTechnique, _AttackSpecification]] = MappingProxyType(
+        {
+            FoundryTechnique.Crescendo: _AttackSpecification(CrescendoAttack),
+            FoundryTechnique.MultiTurn: _AttackSpecification(RedTeamingAttack),
+            FoundryTechnique.Pair: _AttackSpecification(
+                TreeOfAttacksWithPruningAttack,
+                kwargs=(("tree_width", 1),),
+            ),
+            FoundryTechnique.Tap: _AttackSpecification(TreeOfAttacksWithPruningAttack),
+        }
+    )
+    _CONVERTER_SPECIFICATIONS: ClassVar[Mapping[FoundryTechnique, _ConverterSpecification]] = MappingProxyType(
+        {
+            FoundryTechnique.AnsiAttack: _ConverterSpecification(AnsiAttackConverter),
+            FoundryTechnique.AsciiArt: _ConverterSpecification(AsciiArtConverter),
+            FoundryTechnique.AsciiSmuggler: _ConverterSpecification(AsciiSmugglerConverter),
+            FoundryTechnique.Atbash: _ConverterSpecification(AtbashConverter),
+            FoundryTechnique.Base64: _ConverterSpecification(Base64Converter),
+            FoundryTechnique.Binary: _ConverterSpecification(BinaryConverter),
+            FoundryTechnique.Caesar: _ConverterSpecification(
+                CaesarConverter,
+                kwargs=(("caesar_offset", 3),),
+            ),
+            FoundryTechnique.CharacterSpace: _ConverterSpecification(CharacterSpaceConverter),
+            FoundryTechnique.CharSwap: _ConverterSpecification(CharSwapConverter),
+            FoundryTechnique.Diacritic: _ConverterSpecification(DiacriticConverter),
+            FoundryTechnique.Flip: _ConverterSpecification(FlipConverter),
+            FoundryTechnique.Leetspeak: _ConverterSpecification(LeetspeakConverter),
+            FoundryTechnique.Morse: _ConverterSpecification(MorseConverter),
+            FoundryTechnique.ROT13: _ConverterSpecification(ROT13Converter),
+            FoundryTechnique.SuffixAppend: _ConverterSpecification(
+                SuffixAppendConverter,
+                kwargs=(("suffix", "!!!"),),
+            ),
+            FoundryTechnique.StringJoin: _ConverterSpecification(StringJoinConverter),
+            FoundryTechnique.Tense: _ConverterSpecification(
+                TenseConverter,
+                kwargs=(("tense", "past"),),
+                target_kwarg="converter_target",
+            ),
+            FoundryTechnique.UnicodeConfusable: _ConverterSpecification(UnicodeConfusableConverter),
+            FoundryTechnique.UnicodeSubstitution: _ConverterSpecification(UnicodeSubstitutionConverter),
+            FoundryTechnique.Url: _ConverterSpecification(UrlConverter),
+            FoundryTechnique.Jailbreak: _ConverterSpecification(
+                TextJailbreakConverter,
+                deferred_kwargs=(("jailbreak_template", lambda: TextJailBreak(random_template=True)),),
+            ),
+        }
+    )
 
     @apply_defaults
     def __init__(
@@ -242,7 +338,6 @@ class RedTeamAgent(Scenario):
         super().__init__(
             version=self.VERSION,
             technique_class=FoundryTechnique,
-            default_technique=FoundryTechnique.EASY,
             default_dataset_config=DatasetAttackConfiguration(dataset_names=["harmbench"], max_dataset_size=4),
             objective_scorer=objective_scorer,
             scenario_result_id=scenario_result_id,
@@ -348,10 +443,21 @@ class RedTeamAgent(Scenario):
             list[AtomicAttack]: The list of AtomicAttack instances in this scenario.
         """
         seed_groups = list(context.seed_groups)
-        return [
+        atomic_attacks: list[AtomicAttack] = []
+        if context.include_baseline:
+            atomic_attacks.append(
+                build_baseline_atomic_attack(
+                    objective_target=context.objective_target,
+                    objective_scorer=self._objective_scorer,
+                    seed_groups=seed_groups,
+                    memory_labels=context.memory_labels,
+                )
+            )
+        atomic_attacks.extend(
             self._get_attack_from_technique(composite=composition, seed_groups=seed_groups)
             for composition in self._scenario_composites
-        ]
+        )
+        return atomic_attacks
 
     def _get_attack_from_technique(
         self, *, composite: FoundryComposite, seed_groups: list[AttackSeedGroup]
@@ -370,70 +476,22 @@ class RedTeamAgent(Scenario):
         Raises:
             ValueError: If a converter technique in the composite is not recognized.
         """
-        attack: AttackStrategy[Any, Any]
-
-        attack_type: type[AttackStrategy[Any, Any]] = PromptSendingAttack
-        attack_kwargs: dict[str, Any] = {}
-        if composite.attack is not None:
-            if composite.attack == FoundryTechnique.Crescendo:
-                attack_type = CrescendoAttack
-            elif composite.attack == FoundryTechnique.MultiTurn:
-                attack_type = RedTeamingAttack
-            elif composite.attack == FoundryTechnique.Pair:
-                attack_type = TreeOfAttacksWithPruningAttack
-                attack_kwargs = {"tree_width": 1}
-            elif composite.attack == FoundryTechnique.Tap:
-                attack_type = TreeOfAttacksWithPruningAttack
-
+        attack_specification = self._ATTACK_SPECIFICATIONS.get(
+            composite.attack,
+            self._DEFAULT_ATTACK_SPECIFICATION,
+        )
         converters: list[Converter] = []
         for technique in composite.converters:
-            if technique == FoundryTechnique.AnsiAttack:
-                converters.append(AnsiAttackConverter())
-            elif technique == FoundryTechnique.AsciiArt:
-                converters.append(AsciiArtConverter())
-            elif technique == FoundryTechnique.AsciiSmuggler:
-                converters.append(AsciiSmugglerConverter())
-            elif technique == FoundryTechnique.Atbash:
-                converters.append(AtbashConverter())
-            elif technique == FoundryTechnique.Base64:
-                converters.append(Base64Converter())
-            elif technique == FoundryTechnique.Binary:
-                converters.append(BinaryConverter())
-            elif technique == FoundryTechnique.Caesar:
-                converters.append(CaesarConverter(caesar_offset=3))
-            elif technique == FoundryTechnique.CharacterSpace:
-                converters.append(CharacterSpaceConverter())
-            elif technique == FoundryTechnique.CharSwap:
-                converters.append(CharSwapConverter())
-            elif technique == FoundryTechnique.Diacritic:
-                converters.append(DiacriticConverter())
-            elif technique == FoundryTechnique.Flip:
-                converters.append(FlipConverter())
-            elif technique == FoundryTechnique.Leetspeak:
-                converters.append(LeetspeakConverter())
-            elif technique == FoundryTechnique.Morse:
-                converters.append(MorseConverter())
-            elif technique == FoundryTechnique.ROT13:
-                converters.append(ROT13Converter())
-            elif technique == FoundryTechnique.SuffixAppend:
-                converters.append(SuffixAppendConverter(suffix="!!!"))
-            elif technique == FoundryTechnique.StringJoin:
-                converters.append(StringJoinConverter())
-            elif technique == FoundryTechnique.Tense:
-                converters.append(TenseConverter(tense="past", converter_target=self._adversarial_chat))
-            elif technique == FoundryTechnique.UnicodeConfusable:
-                converters.append(UnicodeConfusableConverter())
-            elif technique == FoundryTechnique.UnicodeSubstitution:
-                converters.append(UnicodeSubstitutionConverter())
-            elif technique == FoundryTechnique.Url:
-                converters.append(UrlConverter())
-            elif technique == FoundryTechnique.Jailbreak:
-                jailbreak_template = TextJailBreak(random_template=True)
-                converters.append(TextJailbreakConverter(jailbreak_template=jailbreak_template))
-            else:
+            converter_specification = self._CONVERTER_SPECIFICATIONS.get(technique)
+            if converter_specification is None:
                 raise ValueError(f"Unknown technique: {technique}")
+            converters.append(converter_specification.create(converter_target=self._adversarial_chat))
 
-        attack = self._get_attack(attack_type=attack_type, converters=converters, attack_kwargs=attack_kwargs)
+        attack = self._get_attack(
+            attack_type=attack_specification.attack_type,
+            converters=converters,
+            attack_kwargs=dict(attack_specification.kwargs),
+        )
 
         return AtomicAttack(
             atomic_attack_name=composite.name,

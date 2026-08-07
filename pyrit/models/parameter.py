@@ -191,18 +191,16 @@ class Parameter(BaseModel):
         Whether a single string token can be coerced to this parameter's value.
 
         True for a non-reference plain scalar (``str`` / ``int`` / ``float`` /
-        ``bool``) or ``Literal[...]`` parameter — exactly the forms a text field or
-        CLI token can supply. References and structured types (lists, enums,
-        arbitrary objects) are False and are surfaced/handled elsewhere.
+        ``bool``), ``Literal[...]``, or ``Enum`` parameter — exactly the forms a
+        text field or CLI token can supply. References and structured types (lists
+        and arbitrary objects) are False and are surfaced/handled elsewhere.
 
         Returns:
             bool: True when a string can be coerced to this parameter's value.
         """
-        if self.reference is not None:
+        if self.reference is not None or self.opaque:
             return False
-        if self.param_type in _SUPPORTED_SCALAR_TYPES:
-            return True
-        return get_origin(self.param_type) is Literal
+        return _is_scalar_param_type(_unwrap_optional(self.param_type))
 
     def is_reference_to(self, component_type: ComponentType) -> bool:
         """
@@ -247,6 +245,9 @@ class Parameter(BaseModel):
         if self.reference is not None or self.opaque:
             return raw_value
         param_type = self.param_type
+        if raw_value is None and type(None) in get_args(param_type):
+            return None
+        param_type = _unwrap_optional(param_type)
         if param_type is None:
             return copy.deepcopy(raw_value)
         if get_origin(param_type) is list:
@@ -537,11 +538,16 @@ def _render_type_name(param_type: Any) -> str:
         return type(args[0]).__name__ if args else "str"
     if get_origin(param_type) is list:
         type_args = get_args(param_type)
-        element_type = type_args[0] if type_args else str
+        element_type = _unwrap_optional(type_args[0]) if type_args else str
         if get_origin(element_type) is Literal:
             element_args = get_args(element_type)
             element_name = type(element_args[0]).__name__ if element_args else "str"
             return f"list[{element_name}]"
+        if isinstance(element_type, type) and issubclass(element_type, Enum):
+            member = next(iter(element_type), None)
+            return f"list[{type(member.value).__name__ if member is not None else 'str'}]"
+        if _is_scalar_param_type(element_type):
+            return f"list[{element_type.__name__}]"
     # Detect parameterized generics (list[str], dict[str, int], ...) reliably across Python
     # versions: get_origin returns the unparameterized type for GenericAlias, None otherwise.
     if get_origin(param_type) is not None:
@@ -563,11 +569,19 @@ def display_choices(param_type: Any) -> tuple[Any, ...] | None:
     Args:
         param_type (Any): The parameter's type annotation.
 
+    A ``list[...]`` parameter is unwrapped to its element type first, so a
+    constrained list (``list[Literal[...]]`` / ``list[Enum]``) surfaces its
+    element's allowed set — the ``is_list`` + ``choices`` projection a multi-select
+    consumer needs.
+
     Returns:
         tuple[Any, ...] | None: The allowed members for a constrained scalar
         (``Literal`` args or ``Enum`` member values), or None when unconstrained.
     """
     unwrapped = _unwrap_optional(param_type)
+    if get_origin(unwrapped) is list:
+        type_args = get_args(unwrapped)
+        unwrapped = _unwrap_optional(type_args[0]) if type_args else str
     if get_origin(unwrapped) is Literal:
         return get_args(unwrapped)
     if isinstance(unwrapped, type) and issubclass(unwrapped, Enum):

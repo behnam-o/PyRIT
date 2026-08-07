@@ -52,6 +52,9 @@ The main components of PyRIT are seeds, scenarios, attack techniques, executors 
 
 The diagram below shows how the pieces fit together: entry points run **scenarios**, which package **datasets** with **attack techniques**; each technique drives an **attack/executor** that orchestrates **converters**, **targets**, and **scorers**; and a shared library layer (**memory**, **registry**, **models**, **output**, and more) supports all of them.
 
+:::{div}
+:class: col-page-right
+
 ```mermaid
 flowchart TB
     subgraph entry [Entry points]
@@ -105,6 +108,7 @@ flowchart TB
     class SCEN,TECH,ATK flow;
     class MEM,REG,MODEL,OUT libnode;
 ```
+:::
 
 The orchestration layers **nest from broadest to narrowest** — each owns less than the layer above it:
 
@@ -177,7 +181,7 @@ If you are contributing to PyRIT, that work will most likely land in one of the 
 - Techniques are self-describing `AttackTechniqueFactory` instances (a `name`, `attack_class`, `attack_kwargs`, and `technique_tags`). They read like configuration even though they are code, so adding one — or bringing your own — is easy. The canonical catalog lives under `pyrit/setup/initializers/techniques/`: `core.py` (a small, curated standard set, auto-loaded on a bare `initialize_pyrit_async`), `extra.py` (the broader collection, opt-in), and per-source modules like `airt.py` (owned by a source/scenario but reusable, tagged with their owner and kept out of the default pool).
 - `core` stays deliberately small so a default run doesn't print 200 techniques or take forever; the wider catalog lives in `extra` and is selected on demand. Users pick subsets by passing initializer tags (e.g. `core`, `extra`, `all`) or writing their own initializer, so different runs — including from the CLI — can register different technique sets without changing the catalog.
 - A technique tied to one scenario is fine; if it's pinned and non-reusable it can stay local to that scenario, but if another scenario could reuse it, promote it to a catalog module and tag it.
-- Tags describe a technique (behavioral tags like `single_turn`/`multi_turn`, owner tags like `airt`); they don't decide what a scenario runs. There is deliberately **no global `default` tag** — a default is scenario-relative, declared per scenario via `build_technique_class_from_factories` (`available` selects the pool, aggregates are named presets, `default` / `default_technique_names` set what runs when nothing is chosen).
+- Tags describe a technique (behavioral tags like `single_turn`/`multi_turn`, owner tags like `airt`); they don't decide what a scenario runs. There is deliberately **no global `default` tag** — a default is scenario-relative, declared per scenario via `build_technique_class_from_factories` (the `factories` list is the pool, catalog tags become named aggregate presets, and `default_tags` / `default_names` set what runs when nothing is chosen).
 - **Does not own**: the conversation algorithm itself. Branching, turn management, and scoring decisions live in the executor it wraps — a technique only selects and configures existing components, and shouldn't implement new sending, scoring, or branching logic.
 
 **Framework Plans**:
