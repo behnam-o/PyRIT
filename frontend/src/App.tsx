@@ -10,6 +10,7 @@ import Home from './components/Home/Home'
 import TargetConfig from './components/Config/TargetConfig'
 import Initializers from './components/Initializers/Initializers'
 import AttackHistory from './components/History/AttackHistory'
+import Scenarios from './components/Scenarios/Scenarios'
 import FeedbackDialog from './components/Feedback/FeedbackDialog'
 import type { HistoryFilters } from './components/History/historyFilters'
 import { ConnectionBanner } from './components/ConnectionBanner'
@@ -36,6 +37,7 @@ const VIEW_PATHS: Record<ViewName, string> = {
   home: '/',
   chat: '/chat',
   history: '/history',
+  scenarios: '/scenarios',
   config: '/config',
   initializers: '/initializers',
 }
@@ -411,6 +413,10 @@ function App() {
                     onNavigate={handleNavigate}
                   />
                 }
+              />
+              <Route
+                path="/scenarios"
+                element={<Scenarios activeTarget={activeTarget} labels={globalLabels} />}
               />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

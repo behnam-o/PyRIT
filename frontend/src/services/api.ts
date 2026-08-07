@@ -28,6 +28,11 @@ import type {
   CreateConversationRequest,
   CreateConversationResponse,
   ChangeMainConversationResponse,
+  RunScenarioRequest,
+  ScenarioCatalogResponse,
+  ScenarioResult,
+  ScenarioRunListResponse,
+  ScenarioRunSummary,
 } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
@@ -335,6 +340,35 @@ export const attacksApi = {
 export const labelsApi = {
   getLabels: async (source: string = 'attacks'): Promise<{ source: string; labels: Record<string, string[]> }> => {
     const response = await apiClient.get('/labels', { params: { source } })
+    return response.data
+  },
+}
+
+export const scenariosApi = {
+  listCatalog: async (): Promise<ScenarioCatalogResponse> => {
+    const response = await apiClient.get('/scenarios/catalog', { params: { limit: 200 } })
+    return response.data
+  },
+
+  startRun: async (request: RunScenarioRequest): Promise<ScenarioRunSummary> => {
+    const response = await apiClient.post('/scenarios/runs', request)
+    return response.data
+  },
+
+  listRuns: async (limit = 100): Promise<ScenarioRunListResponse> => {
+    const response = await apiClient.get('/scenarios/runs', { params: { limit } })
+    return response.data
+  },
+
+  getRun: async (scenarioResultId: string): Promise<ScenarioRunSummary> => {
+    const response = await apiClient.get(`/scenarios/runs/${encodeURIComponent(scenarioResultId)}`)
+    return response.data
+  },
+
+  getResults: async (scenarioResultId: string): Promise<ScenarioResult> => {
+    const response = await apiClient.get(
+      `/scenarios/runs/${encodeURIComponent(scenarioResultId)}/results`
+    )
     return response.data
   },
 }

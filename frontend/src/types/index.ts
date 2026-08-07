@@ -377,3 +377,86 @@ export interface ChangeMainConversationResponse {
   attack_result_id: string
   conversation_id: string
 }
+
+// --- Scenarios ---
+
+export type ScenarioRunState = 'CREATED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
+
+export interface RegisteredScenario {
+  scenario_name: string
+  scenario_type: string
+  description: string
+  default_technique: string
+  aggregate_techniques: string[]
+  all_techniques: string[]
+  default_datasets: string[]
+  supported_parameters: Parameter[]
+}
+
+export interface ScenarioCatalogResponse {
+  items: RegisteredScenario[]
+  pagination: PaginationInfo
+}
+
+export interface RunScenarioRequest {
+  scenario_name: string
+  target_name: string
+  techniques?: string[]
+  dataset_names?: string[]
+  max_dataset_size?: number
+  max_concurrency?: number
+  max_retries?: number
+  labels?: Record<string, string>
+}
+
+export interface ScenarioRunSummary {
+  scenario_result_id: string
+  scenario_name: string
+  scenario_version: number
+  status: ScenarioRunState
+  created_at: string
+  updated_at: string
+  completed_at?: string | null
+  error?: string | null
+  error_type?: string | null
+  techniques_used: string[]
+  total_attacks: number
+  completed_attacks: number
+  objective_achieved_rate: number
+  total_retries: number
+  labels: Record<string, string>
+}
+
+export interface ScenarioRunListResponse {
+  items: ScenarioRunSummary[]
+}
+
+export interface ScenarioAttackResult {
+  attack_result_id: string
+  conversation_id: string
+  objective: string
+  outcome: 'success' | 'failure' | 'error' | 'undetermined'
+  outcome_reason?: string | null
+  executed_turns: number
+  execution_time_ms: number
+  timestamp: string
+  last_response?: BackendMessagePiece | null
+  last_score?: BackendScore | null
+  error_message?: string | null
+  error_type?: string | null
+  targeted_harm_categories: string[]
+}
+
+export interface ScenarioResult {
+  id: string
+  scenario_name: string
+  scenario_version: number
+  scenario_description: string
+  scenario_run_state: ScenarioRunState
+  attack_results: Record<string, ScenarioAttackResult[]>
+  display_group_map: Record<string, string>
+  creation_time: string
+  completion_time?: string | null
+  error_message?: string | null
+  labels: Record<string, string>
+}
