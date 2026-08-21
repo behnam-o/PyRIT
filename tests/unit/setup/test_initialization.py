@@ -14,7 +14,11 @@ from pyrit.common.apply_defaults import reset_default_values
 from pyrit.common.singleton import Singleton
 from pyrit.registry import InitializerRegistry
 from pyrit.setup import IN_MEMORY, initialize_pyrit_async
-from pyrit.setup.initialization import _load_env_from_akv_async, _load_environment_files, _parse_akv_secret_url
+from pyrit.setup.initialization import (
+    _load_env_from_akv_async,
+    _load_environment_files_async,
+    _parse_akv_secret_url,
+)
 
 
 class TestLoadInitializersFromScripts:
@@ -122,16 +126,16 @@ class TestInitializePyrit:
         reset_default_values()
 
     @mock.patch("pyrit.memory.central_memory.CentralMemory.set_memory_instance")
-    @mock.patch("pyrit.setup.initialization._load_environment_files")
+    @mock.patch("pyrit.setup.initialization._load_environment_files_async", new_callable=mock.AsyncMock)
     async def test_initialize_basic(self, mock_load_env, mock_set_memory):
         """Test basic initialization."""
         await initialize_pyrit_async(memory_db_type=IN_MEMORY)
 
-        mock_load_env.assert_called_once()
+        mock_load_env.assert_awaited_once()
         mock_set_memory.assert_called_once()
 
     @mock.patch("pyrit.memory.central_memory.CentralMemory.set_memory_instance")
-    @mock.patch("pyrit.setup.initialization._load_environment_files")
+    @mock.patch("pyrit.setup.initialization._load_environment_files_async", new_callable=mock.AsyncMock)
     async def test_initialize_with_script(self, mock_load_env, mock_set_memory):
         """Test initialization with a script."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
@@ -156,7 +160,7 @@ class ScriptInit(PyRITInitializer):
 
         try:
             await initialize_pyrit_async(memory_db_type=IN_MEMORY, initialization_scripts=[script_path])
-            mock_load_env.assert_called_once()
+            mock_load_env.assert_awaited_once()
             mock_set_memory.assert_called_once()
         finally:
             os.unlink(script_path)
@@ -167,31 +171,31 @@ class ScriptInit(PyRITInitializer):
             await initialize_pyrit_async(memory_db_type="InvalidType")  # type: ignore[arg-type]
 
     @mock.patch("pyrit.memory.central_memory.CentralMemory.set_memory_instance")
-    @mock.patch("pyrit.setup.initialization._load_environment_files")
+    @mock.patch("pyrit.setup.initialization._load_environment_files_async", new_callable=mock.AsyncMock)
     @mock.patch("pyrit.setup.initialization._load_env_from_akv_async", new_callable=mock.AsyncMock)
     async def test_initialize_with_env_akv_ref(self, mock_load_akv, mock_load_env, mock_set_memory):
         """Test that env_akv_ref triggers AKV env loading."""
         refs = ["https://vault.vault.azure.net/secrets/test-secret"]
 
-        await initialize_pyrit_async(memory_db_type=IN_MEMORY, env_akv_ref=refs)
+        await initialize_pyrit_async(memory_db_type=IN_MEMORY, env_akv_ref=refs, load_defaults=False)
 
         mock_load_akv.assert_awaited_once()
         assert mock_load_akv.await_args.kwargs["secret_urls"] == refs
         assert mock_load_akv.await_args.kwargs["silent"] is False
-        mock_load_env.assert_called_once()
+        mock_load_env.assert_awaited_once()
         mock_set_memory.assert_called_once()
 
     @mock.patch("pyrit.memory.central_memory.CentralMemory.set_memory_instance")
-    @mock.patch("pyrit.setup.initialization._load_environment_files")
+    @mock.patch("pyrit.setup.initialization._load_environment_files_async", new_callable=mock.AsyncMock)
     @mock.patch("pyrit.setup.initialization._load_env_from_akv_async", new_callable=mock.AsyncMock)
     async def test_initialize_with_empty_env_akv_ref_does_not_load_akv(
         self, mock_load_akv, mock_load_env, mock_set_memory
     ):
         """Test that empty env_akv_ref does not invoke AKV loading."""
-        await initialize_pyrit_async(memory_db_type=IN_MEMORY, env_akv_ref=[])
+        await initialize_pyrit_async(memory_db_type=IN_MEMORY, env_akv_ref=[], load_defaults=False)
 
         mock_load_akv.assert_not_called()
-        mock_load_env.assert_called_once()
+        mock_load_env.assert_awaited_once()
         mock_set_memory.assert_called_once()
 
     @mock.patch("pyrit.memory.central_memory.CentralMemory.set_memory_instance")
@@ -202,16 +206,16 @@ class ScriptInit(PyRITInitializer):
         async def _record_akv_call(*, secret_urls, silent=False):
             call_order.append("akv")
 
-        def _record_env_file_call(*, env_files, silent=False):
+        async def _record_env_file_call(*, env_files, silent=False):
             call_order.append("env_files")
 
         refs = ["https://vault.vault.azure.net/secrets/test-secret"]
 
         with (
             mock.patch("pyrit.setup.initialization._load_env_from_akv_async", side_effect=_record_akv_call),
-            mock.patch("pyrit.setup.initialization._load_environment_files", side_effect=_record_env_file_call),
+            mock.patch("pyrit.setup.initialization._load_environment_files_async", side_effect=_record_env_file_call),
         ):
-            await initialize_pyrit_async(memory_db_type=IN_MEMORY, env_akv_ref=refs)
+            await initialize_pyrit_async(memory_db_type=IN_MEMORY, env_akv_ref=refs, load_defaults=False)
 
         assert call_order == ["akv", "env_files"]
         mock_set_memory.assert_called_once()
@@ -253,9 +257,9 @@ class TestInitializePyritSilent:
 
 
 class TestLoadEnvironmentFiles:
-    """Tests for _load_environment_files function and env_files parameter in initialize_pyrit_async."""
+    """Tests for _load_environment_files_async and env_files in initialize_pyrit_async."""
 
-    @mock.patch("pyrit.setup.initialization.dotenv.load_dotenv")
+    @mock.patch("pyrit.setup.initialization.dotenv.dotenv_values", return_value={})
     @mock.patch("pyrit.setup.initialization.path.CONFIGURATION_DIRECTORY_PATH")
     async def test_loads_default_env_files_when_none_provided(self, mock_config_path, mock_load_dotenv):
         """Test that default .env and .env.local files are loaded when env_files is None."""
@@ -273,7 +277,7 @@ class TestLoadEnvironmentFiles:
             mock_config_path.__truediv__ = lambda self, other: temp_path / other
 
             # Call the function with None (default behavior)
-            _load_environment_files(env_files=None)
+            await _load_environment_files_async(env_files=None)
 
             # Verify both files were loaded
             assert mock_load_dotenv.call_count == 2
@@ -281,7 +285,7 @@ class TestLoadEnvironmentFiles:
             assert env_file in calls
             assert env_local_file in calls
 
-    @mock.patch("pyrit.setup.initialization.dotenv.load_dotenv")
+    @mock.patch("pyrit.setup.initialization.dotenv.dotenv_values", return_value={})
     @mock.patch("pyrit.setup.initialization.path.CONFIGURATION_DIRECTORY_PATH")
     async def test_only_loads_existing_default_files(self, mock_config_path, mock_load_dotenv):
         """Test that only existing default files are loaded."""
@@ -294,13 +298,13 @@ class TestLoadEnvironmentFiles:
 
             mock_config_path.__truediv__ = lambda self, other: temp_path / other
 
-            _load_environment_files(env_files=None)
+            await _load_environment_files_async(env_files=None)
 
             # Verify only one file was loaded
             assert mock_load_dotenv.call_count == 1
             assert mock_load_dotenv.call_args[0][0] == env_file
 
-    @mock.patch("pyrit.setup.initialization.dotenv.load_dotenv")
+    @mock.patch("pyrit.setup.initialization.dotenv.dotenv_values", return_value={})
     async def test_loads_custom_env_files_in_order(self, mock_load_dotenv):
         """Test that custom env_files are loaded in the order provided."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -315,7 +319,7 @@ class TestLoadEnvironmentFiles:
             env3.write_text("VAR=local")
 
             # Pass custom files
-            _load_environment_files(env_files=[env1, env2, env3])
+            await _load_environment_files_async(env_files=[env1, env2, env3])
 
             # Verify all three files were loaded in order
             assert mock_load_dotenv.call_count == 3
@@ -327,7 +331,30 @@ class TestLoadEnvironmentFiles:
         nonexistent = pathlib.Path("/nonexistent/path/.env")
 
         with pytest.raises(ValueError, match="Environment file not found"):
-            _load_environment_files(env_files=[nonexistent])
+            await _load_environment_files_async(env_files=[nonexistent])
+
+    @mock.patch(
+        "pyrit.setup.initialization._get_akv_secret_value_async",
+        new_callable=mock.AsyncMock,
+        return_value="resolved-secret",
+    )
+    async def test_async_loader_resolves_akv_values_before_setting_environment(self, mock_get_secret):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_file = pathlib.Path(temp_dir) / ".env"
+            env_file.write_text(
+                "PLAIN=value\nSECRET=akv:https://vault.vault.azure.net/secrets/secret/v1\nINTERPOLATED=${PLAIN}-suffix"
+            )
+
+            with mock.patch.dict(os.environ, {}, clear=True):
+                await _load_environment_files_async(env_files=[env_file], silent=True)
+
+                assert os.environ["PLAIN"] == "value"
+                assert os.environ["SECRET"] == "resolved-secret"
+                assert os.environ["INTERPOLATED"] == "value-suffix"
+
+        assert mock_get_secret.await_args.kwargs["secret_url"] == (
+            "https://vault.vault.azure.net/secrets/secret/v1"
+        )
 
     @mock.patch("pyrit.memory.central_memory.CentralMemory.set_memory_instance")
     async def test_initialize_pyrit_with_custom_env_files(self, mock_set_memory):
@@ -350,7 +377,7 @@ class TestLoadEnvironmentFiles:
         with pytest.raises(ValueError, match="Environment file not found"):
             await initialize_pyrit_async(memory_db_type=IN_MEMORY, env_files=[nonexistent])
 
-    @mock.patch("pyrit.setup.initialization.dotenv.load_dotenv")
+    @mock.patch("pyrit.setup.initialization.dotenv.dotenv_values", return_value={})
     @mock.patch("pyrit.setup.initialization.path.HOME_PATH")
     @mock.patch("pyrit.memory.central_memory.CentralMemory.set_memory_instance")
     async def test_custom_env_files_override_default_behavior(self, mock_set_memory, mock_home_path, mock_load_dotenv):
@@ -403,10 +430,10 @@ class TestAkvEnvironmentLoading:
         with pytest.raises(ValueError, match="Invalid AKV secret URL"):
             _parse_akv_secret_url("https://myvault.vault.azure.net/not-secrets/my-secret")
 
-    @mock.patch("pyrit.setup.initialization.dotenv.load_dotenv")
-    async def test_load_env_from_akv_async_empty_urls_noop(self, mock_load_dotenv):
+    @mock.patch("pyrit.setup.initialization.dotenv.dotenv_values")
+    async def test_load_env_from_akv_async_empty_urls_noop(self, mock_dotenv_values):
         await _load_env_from_akv_async(secret_urls=[])
-        mock_load_dotenv.assert_not_called()
+        mock_dotenv_values.assert_not_called()
 
     async def test_load_env_from_akv_async_loads_secret_content(self):
         class FakeCredential:
@@ -444,7 +471,10 @@ class TestAkvEnvironmentLoading:
                     "azure.keyvault.secrets.aio": keyvault_secrets_aio_module,
                 },
             ),
-            mock.patch("pyrit.setup.initialization.dotenv.load_dotenv") as mock_load_dotenv,
+            mock.patch(
+                "pyrit.setup.initialization.dotenv.dotenv_values",
+                return_value={"AKV_VAR": "from_secret"},
+            ) as mock_dotenv_values,
             mock.patch("pyrit.setup.initialization._print_msg") as mock_print_msg,
         ):
             await _load_env_from_akv_async(
@@ -457,7 +487,7 @@ class TestAkvEnvironmentLoading:
         assert isinstance(client_calls[0][2], FakeCredential)
         assert client_calls[1] == ("get_secret", "my-secret", "v1")
 
-        stream = mock_load_dotenv.call_args.kwargs["stream"]
+        stream = mock_dotenv_values.call_args.kwargs["stream"]
         assert stream.getvalue() == "AKV_VAR=from_secret\n"
-        assert mock_load_dotenv.call_args.kwargs["override"] is True
+        assert mock_dotenv_values.call_args.kwargs["interpolate"] is True
         assert mock_print_msg.call_count == 2

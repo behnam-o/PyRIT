@@ -29,9 +29,12 @@
 # %%
 import os
 
-from pyrit.setup.initialization import _load_environment_files
+import dotenv
 
-_load_environment_files(env_files=None)
+from pyrit.common import path
+
+dotenv.load_dotenv(path.CONFIGURATION_DIRECTORY_PATH / ".env", override=True, interpolate=True)
+dotenv.load_dotenv(path.CONFIGURATION_DIRECTORY_PATH / ".env.local", override=True, interpolate=True)
 
 subscription_id = os.environ.get("AZURE_ML_SUBSCRIPTION_ID")
 resource_group = os.environ.get("AZURE_ML_RESOURCE_GROUP")

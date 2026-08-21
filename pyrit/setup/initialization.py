@@ -1,9 +1,11 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
+import asyncio
 import io
 import logging
+import os
 import pathlib
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any, Literal, get_args
 
 import dotenv
@@ -23,7 +25,9 @@ AZURE_SQL = "AzureSQL"
 MemoryDatabaseType = Literal["InMemory", "SQLite", "AzureSQL"]
 
 
-def _load_environment_files(env_files: Sequence[pathlib.Path] | None, *, silent: bool = False) -> None:
+async def _load_environment_files_async(
+    env_files: Sequence[pathlib.Path] | None, *, silent: bool = False
+) -> None:
     """
     Load environment files in the order they are provided.
     Later files override values from earlier files.
@@ -71,7 +75,9 @@ def _load_environment_files(env_files: Sequence[pathlib.Path] | None, *, silent:
         env_files = default_files
 
     for env_file in env_files:
-        dotenv.load_dotenv(env_file, override=True, interpolate=True)
+        values = await asyncio.to_thread(dotenv.dotenv_values, env_file, interpolate=True)
+        resolved_values = await _resolve_akv_references_async(values=values)
+        os.environ.update(resolved_values)
         if not silent:
             _print_msg(f"Loaded environment file: {env_file}", quiet=silent, log=True)
 
@@ -150,8 +156,36 @@ async def _load_env_from_akv_async(*, secret_urls: Sequence[str], silent: bool =
         client = SecretClient(vault_url=vault_url, credential=credential)
         secret = await client.get_secret(secret_name, version=secret_version)
         if secret.value:
-            dotenv.load_dotenv(stream=io.StringIO(secret.value), override=True)
+            values = dotenv.dotenv_values(stream=io.StringIO(secret.value), interpolate=True)
+            resolved_values = await _resolve_akv_references_async(values=values, credential=credential)
+            os.environ.update(resolved_values)
             _print_msg(f"Loaded environment from AKV secret: {secret_url}", quiet=silent, log=True)
+
+
+async def _resolve_akv_references_async(
+    *, values: Mapping[str, str | None], credential: Any | None = None
+) -> dict[str, str]:
+    resolved_values: dict[str, str] = {}
+    for key, value in values.items():
+        if value is None:
+            continue
+        if value.startswith("akv:"):
+            value = await _get_akv_secret_value_async(secret_url=value.removeprefix("akv:"), credential=credential)
+        resolved_values[key] = value
+    return resolved_values
+
+
+async def _get_akv_secret_value_async(*, secret_url: str, credential: Any | None = None) -> str:
+    from azure.identity.aio import DefaultAzureCredential
+    from azure.keyvault.secrets.aio import SecretClient
+
+    credential = credential or DefaultAzureCredential()
+    vault_url, secret_name, secret_version = _parse_akv_secret_url(secret_url)
+    client = SecretClient(vault_url=vault_url, credential=credential)
+    secret = await client.get_secret(secret_name, version=secret_version)
+    if secret.value is None:
+        raise ValueError(f"AKV secret has no value: {secret_url}")
+    return secret.value
 
 
 async def _execute_initializers_async(*, initializers: Sequence["PyRITInitializer"]) -> None:
@@ -242,7 +276,7 @@ async def initialize_pyrit_async(
     if env_akv_ref:
         await _load_env_from_akv_async(secret_urls=env_akv_ref, silent=silent)
 
-    _load_environment_files(env_files=env_files, silent=silent)
+    await _load_environment_files_async(env_files=env_files, silent=silent)
 
     # Reset all default values before executing initialization scripts
     # This ensures a clean state for each initialization
