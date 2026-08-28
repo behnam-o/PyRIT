@@ -368,7 +368,7 @@ describe('TargetTable', () => {
     expect(screen.getByText('dall-e-3')).toBeInTheDocument()
   })
 
-  it('should show hidden targets and allow unhiding them', async () => {
+  it('should show hidden targets and allow restoring them', async () => {
     const user = userEvent.setup()
     render(
       <TestWrapper>
@@ -382,10 +382,39 @@ describe('TargetTable', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Show hidden targets (1)' }))
     expect(screen.getByText('dall-e-3')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Unhide azure_image_dalle' }))
+    await user.click(screen.getByRole('button', { name: 'Show azure_image_dalle' }))
 
     expect(screen.getByText('dall-e-3')).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Show hidden targets (0)' })).toBeDisabled()
+  })
+
+  it('should hide registry entries independently when they share an identifier', async () => {
+    const user = userEvent.setup()
+    const duplicateTargets = [
+      makeTarget({
+        target_registry_name: 'first_registry_name',
+        target_type: 'OpenAIChatTarget',
+        model_name: 'shared-model',
+        identifier_hash: 'shared-identifier-hash',
+      }),
+      makeTarget({
+        target_registry_name: 'second_registry_name',
+        target_type: 'OpenAIChatTarget',
+        model_name: 'shared-model',
+        identifier_hash: 'shared-identifier-hash',
+      }),
+    ]
+    render(
+      <TestWrapper>
+        <TargetTable {...defaultProps} targets={duplicateTargets} />
+      </TestWrapper>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Hide first_registry_name' }))
+
+    expect(screen.queryByText('first_registry_name')).not.toBeInTheDocument()
+    expect(screen.getByText('second_registry_name')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Show hidden targets (1)' })).toBeInTheDocument()
   })
 
   it('should not show filter when only one target type exists', () => {

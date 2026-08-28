@@ -37,7 +37,6 @@ import {
 import type { TargetInstance } from '@/types'
 import {
   targetEndpoint,
-  targetIdentifierHash,
   targetModelName,
   targetType,
   targetUnderlyingModelName,
@@ -45,7 +44,7 @@ import {
 
 import { useTargetTableStyles } from './TargetTable.styles'
 
-const HIDDEN_TARGETS_STORAGE_KEY = 'pyrit.hiddenTargetIdentifierHashes'
+const HIDDEN_TARGETS_STORAGE_KEY = 'pyrit.hiddenTargetRegistryNames'
 
 interface TargetTableProps {
   targets: TargetInstance[]
@@ -53,7 +52,7 @@ interface TargetTableProps {
   onSetActiveTarget: (target: TargetInstance) => void
 }
 
-function readStoredHiddenTargetHashes(): Set<string> {
+function readStoredHiddenTargetRegistryNames(): Set<string> {
   if (typeof window === 'undefined') return new Set()
   try {
     const raw = window.localStorage.getItem(HIDDEN_TARGETS_STORAGE_KEY)
@@ -66,12 +65,12 @@ function readStoredHiddenTargetHashes(): Set<string> {
   }
 }
 
-function persistHiddenTargetHashes(hiddenTargetHashes: Set<string>): void {
+function persistHiddenTargetRegistryNames(hiddenTargetRegistryNames: Set<string>): void {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(
       HIDDEN_TARGETS_STORAGE_KEY,
-      JSON.stringify([...hiddenTargetHashes].sort()),
+      JSON.stringify([...hiddenTargetRegistryNames].sort()),
     )
   } catch {
     /* localStorage may be unavailable (private mode, quota, sandboxed iframe). */
@@ -287,8 +286,8 @@ export default function TargetTable({ targets, activeTarget, onSetActiveTarget }
   const styles = useTargetTableStyles()
   const typeFilterId = useId()
   const [typeFilter, setTypeFilter] = useState('')
-  const [hiddenTargetHashes, setHiddenTargetHashes] = useState<Set<string>>(
-    () => readStoredHiddenTargetHashes(),
+  const [hiddenTargetRegistryNames, setHiddenTargetRegistryNames] = useState<Set<string>>(
+    () => readStoredHiddenTargetRegistryNames(),
   )
   const [showHiddenTargets, setShowHiddenTargets] = useState(false)
   // Tracks which RoundRobinTarget rows are expanded to show inner targets.
@@ -317,15 +316,15 @@ export default function TargetTable({ targets, activeTarget, onSetActiveTarget }
   )
 
   const hiddenTargetCount = useMemo(
-    () => targets.filter((target) => hiddenTargetHashes.has(targetIdentifierHash(target))).length,
-    [hiddenTargetHashes, targets],
+    () => targets.filter((target) => hiddenTargetRegistryNames.has(target.target_registry_name)).length,
+    [hiddenTargetRegistryNames, targets],
   )
 
   const displayedTargets = useMemo(
     () => showHiddenTargets
       ? targets
-      : targets.filter((target) => !hiddenTargetHashes.has(targetIdentifierHash(target))),
-    [hiddenTargetHashes, showHiddenTargets, targets],
+      : targets.filter((target) => !hiddenTargetRegistryNames.has(target.target_registry_name)),
+    [hiddenTargetRegistryNames, showHiddenTargets, targets],
   )
 
   const filteredTargets = useMemo(
@@ -339,15 +338,14 @@ export default function TargetTable({ targets, activeTarget, onSetActiveTarget }
     activeTarget?.target_registry_name === target.target_registry_name
 
   const setTargetHidden = (target: TargetInstance, hidden: boolean): void => {
-    const nextHiddenTargetHashes = new Set(hiddenTargetHashes)
-    const identifierHash = targetIdentifierHash(target)
+    const nextHiddenTargetRegistryNames = new Set(hiddenTargetRegistryNames)
     if (hidden) {
-      nextHiddenTargetHashes.add(identifierHash)
+      nextHiddenTargetRegistryNames.add(target.target_registry_name)
     } else {
-      nextHiddenTargetHashes.delete(identifierHash)
+      nextHiddenTargetRegistryNames.delete(target.target_registry_name)
     }
-    setHiddenTargetHashes(nextHiddenTargetHashes)
-    persistHiddenTargetHashes(nextHiddenTargetHashes)
+    setHiddenTargetRegistryNames(nextHiddenTargetRegistryNames)
+    persistHiddenTargetRegistryNames(nextHiddenTargetRegistryNames)
   }
 
   return (
@@ -491,7 +489,7 @@ export default function TargetTable({ targets, activeTarget, onSetActiveTarget }
           {filteredTargets.map((target) => {
             const expanded = expandedRows.has(target.target_registry_name)
             const expandable = hasInnerTargets(target)
-            const hidden = hiddenTargetHashes.has(targetIdentifierHash(target))
+            const hidden = hiddenTargetRegistryNames.has(target.target_registry_name)
             // Extract weights from target_specific_params so we can show per-inner-target weight
             const weights = target.target_specific_params?.weights as number[] | undefined
 
@@ -526,10 +524,10 @@ export default function TargetTable({ targets, activeTarget, onSetActiveTarget }
                         size="small"
                         icon={hidden ? <EyeRegular /> : <EyeOffRegular />}
                         onClick={() => setTargetHidden(target, !hidden)}
-                        aria-label={`${hidden ? 'Unhide' : 'Hide'} ${target.target_registry_name}`}
+                        aria-label={`${hidden ? 'Show' : 'Hide'} ${target.target_registry_name}`}
                         data-testid={`toggle-target-visibility-${target.target_registry_name}`}
                       >
-                        {hidden ? 'Unhide' : 'Hide'}
+                        {hidden ? 'Show' : 'Hide'}
                       </Button>
                     </div>
                   </TableCell>
