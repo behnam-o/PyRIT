@@ -6,13 +6,14 @@ Tests for backend target service.
 """
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from pyrit.backend.models.targets import CreateTargetRequest
 from pyrit.backend.services.target_service import TargetService, get_target_service
-from pyrit.models import ComponentIdentifier
+from pyrit.memory.memory_interface import MemoryInterface
+from pyrit.models import ComponentIdentifier, PersistedTarget
 from pyrit.prompt_target import PromptTarget, TargetCapabilities
 from pyrit.registry import TargetRegistry
 from unit.mocks import MockPromptTarget
@@ -261,6 +262,19 @@ class TestListTargetCatalog:
 
         assert cold == warm
 
+    async def test_catalog_reports_persistence_capabilities(self) -> None:
+        service = TargetService()
+        service.configure_persistence(
+            memory=MagicMock(spec=MemoryInterface),
+            definitions_enabled=True,
+            target_secret_key_vault_url="https://test.vault.azure.net",
+        )
+
+        result = await service.list_target_catalog_async()
+
+        assert result.persistence.definitions_enabled is True
+        assert result.persistence.api_keys_enabled is True
+
     async def test_catalog_refreshes_after_runtime_class_registration(self) -> None:
         service = TargetService()
         initial = await service.list_target_catalog_async()
@@ -420,6 +434,110 @@ class TestCreateTarget:
         # Object should be retrievable from registry
         target_obj = service.get_target_object(target_registry_name=result.target_registry_name)
         assert target_obj is not None
+
+    async def test_create_target_with_api_key_is_memory_only_without_key_vault(self, sqlite_instance) -> None:
+        memory = MagicMock(spec=MemoryInterface)
+        service = TargetService()
+        service.configure_persistence(
+            memory=memory,
+            definitions_enabled=True,
+            target_secret_key_vault_url=None,
+        )
+
+        await service.create_target_async(
+            request=CreateTargetRequest(
+                type="OpenAIChatTarget",
+                params={
+                    "endpoint": "https://test.openai.azure.com/",
+                    "model_name": "gpt-4o",
+                    "api_key": "temporary-key",
+                },
+            )
+        )
+
+        memory.add_persisted_target.assert_not_called()
+
+    async def test_create_target_stores_api_key_outside_definition(self, sqlite_instance) -> None:
+        memory = MagicMock(spec=MemoryInterface)
+        service = TargetService()
+        service.configure_persistence(
+            memory=memory,
+            definitions_enabled=True,
+            target_secret_key_vault_url="https://test.vault.azure.net",
+        )
+
+        with patch.object(service, "_set_api_key_async", new=AsyncMock()) as set_secret:
+            await service.create_target_async(
+                request=CreateTargetRequest(
+                    type="OpenAIChatTarget",
+                    params={
+                        "endpoint": "https://test.openai.azure.com/",
+                        "model_name": "gpt-4o",
+                        "api_key": "durable-key",
+                    },
+                )
+            )
+
+        set_secret.assert_awaited_once()
+        persisted = memory.add_persisted_target.call_args.kwargs["target"]
+        assert isinstance(persisted, PersistedTarget)
+        assert persisted.parameters == {
+            "endpoint": "https://test.openai.azure.com/",
+            "model_name": "gpt-4o",
+        }
+        assert persisted.secret_name is not None
+
+
+class TestRestorePersistedTargets:
+    async def test_restore_recreates_target_with_stored_registry_name(self) -> None:
+        memory = MagicMock(spec=MemoryInterface)
+        memory.get_persisted_targets.return_value = [
+            PersistedTarget(
+                target_registry_name="saved-text-target",
+                target_type="TextTarget",
+            )
+        ]
+        service = TargetService()
+        service.configure_persistence(
+            memory=memory,
+            definitions_enabled=True,
+            target_secret_key_vault_url=None,
+        )
+
+        await service.restore_persisted_targets_async()
+
+        assert service.get_target_object(target_registry_name="saved-text-target") is not None
+
+    async def test_restore_resolves_api_key_from_key_vault(self) -> None:
+        memory = MagicMock(spec=MemoryInterface)
+        memory.get_persisted_targets.return_value = [
+            PersistedTarget(
+                target_registry_name="saved-target",
+                target_type="MockPromptTarget",
+                parameters={"endpoint": "https://example.test"},
+                secret_name="saved-secret",
+            )
+        ]
+        service = TargetService()
+        service.configure_persistence(
+            memory=memory,
+            definitions_enabled=True,
+            target_secret_key_vault_url="https://test.vault.azure.net",
+        )
+        target = _mock_prompt_target()
+
+        with (
+            patch.object(service, "_get_api_key_async", new=AsyncMock(return_value="restored-key")),
+            patch.object(service._registry, "create_instance", return_value=target) as create,
+        ):
+            await service.restore_persisted_targets_async()
+
+        assert create.call_args.args == ("MockPromptTarget",)
+        assert create.call_args.kwargs == {
+            "endpoint": "https://example.test",
+            "api_key": "restored-key",
+        }
+        assert service.get_target_object(target_registry_name="saved-target") is target
 
     async def test_create_target_model_name_not_overridden_by_env_var(self, sqlite_instance) -> None:
         """Test that explicit model_name is not overridden by underlying_model env var."""

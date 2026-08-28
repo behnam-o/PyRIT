@@ -803,6 +803,10 @@ class TestTargetRoutes:
             mock_service = MagicMock()
             mock_service.list_target_catalog_async = AsyncMock(
                 return_value=TargetCatalogResponse(
+                    persistence={
+                        "definitions_enabled": True,
+                        "api_keys_enabled": False,
+                    },
                     items=[
                         {
                             "target_type": "OpenAIChatTarget",

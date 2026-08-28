@@ -688,6 +688,7 @@ silent: true
             """
 max_concurrent_scenario_runs: 7
 allow_custom_initializers: true
+target_secret_key_vault_url: https://targets.vault.azure.net/
 server:
   url: http://localhost:8765/
   startup_timeout: 45
@@ -701,6 +702,7 @@ extensions:
 
         assert config.max_concurrent_scenario_runs == 7
         assert config.allow_custom_initializers is True
+        assert config.target_secret_key_vault_url == "https://targets.vault.azure.net"
         assert config.server == {"url": "http://localhost:8765/", "startup_timeout": 45}
         assert config.server_config == ServerConfig(url="http://localhost:8765", startup_timeout=45.0)
         assert config.extensions == {"feature_flag": "enabled"}

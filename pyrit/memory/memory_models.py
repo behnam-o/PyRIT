@@ -54,6 +54,7 @@ from pyrit.models import (
     ConverterIdentifier,
     EvaluationIdentifier,
     MessagePiece,
+    PersistedTarget,
     PromptDataType,
     ScenarioEvaluationIdentifier,
     ScenarioIdentifier,
@@ -461,6 +462,59 @@ class AdditionalInitializerEntry(DomainBackedEntry[AdditionalInitializer]):
             initializer_name=self.initializer_name,
             parameters=self.parameters,
             order_index=self.order_index,
+        )
+
+
+class PersistedTargetEntry(DomainBackedEntry[PersistedTarget]):
+    """Persistence row for a reconstructable API-created target."""
+
+    __tablename__ = "PersistedTargets"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    target_registry_name: Mapped[str] = mapped_column(String(512), nullable=False, unique=True)
+    target_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    parameters: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    auth_mode: Mapped[str] = mapped_column(String(16), nullable=False)
+    secret_name: Mapped[str | None] = mapped_column(String(127), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    @classmethod
+    def from_domain_model(cls, domain_model: PersistedTarget) -> Self:
+        """
+        Build an unsaved persisted-target row from its domain model.
+
+        Returns:
+            Self: A new, unsaved row.
+        """
+        return cls(
+            id=domain_model.id,
+            target_registry_name=domain_model.target_registry_name,
+            target_type=domain_model.target_type,
+            parameters=domain_model.parameters,
+            auth_mode=domain_model.auth_mode,
+            secret_name=domain_model.secret_name,
+            created_at=domain_model.created_at,
+        )
+
+    def to_domain_model(self) -> PersistedTarget:
+        """
+        Convert this row back into its domain model.
+
+        Returns:
+            PersistedTarget: The reconstructed persisted target.
+        """
+        created_at = self.created_at
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        return PersistedTarget(
+            id=self.id,
+            target_registry_name=self.target_registry_name,
+            target_type=self.target_type,
+            parameters=self.parameters,
+            auth_mode=self.auth_mode,
+            secret_name=self.secret_name,
+            created_at=created_at,
         )
 
 

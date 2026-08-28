@@ -35,6 +35,7 @@ from pyrit.memory.memory_models import (
     ConversationEntry,
     ConverterIdentifierEntry,
     EmbeddingDataEntry,
+    PersistedTargetEntry,
     PromptConverterIdentifierEntry,
     PromptMemoryEntry,
     ScenarioIdentifierEntry,
@@ -67,6 +68,7 @@ from pyrit.models import (
     IdentifierType,
     Message,
     MessagePiece,
+    PersistedTarget,
     ScenarioIdentifier,
     ScenarioResult,
     ScenarioRunState,
@@ -491,6 +493,23 @@ class MemoryInterface(abc.ABC):
                 session.rollback()
                 logger.exception(f"Error deleting additional initializer '{initializer_id}': {e}")
                 raise
+
+    def add_persisted_target(self, *, target: PersistedTarget) -> None:
+        """Insert or replace a persisted target definition, keyed by its ``id``."""
+        self._update_entry(PersistedTargetEntry.from_domain_model(target))
+
+    def get_persisted_targets(self) -> Sequence[PersistedTarget]:
+        """
+        Load persisted target definitions in creation order.
+
+        Returns:
+            Sequence[PersistedTarget]: Persisted target definitions.
+        """
+        entries = self._query_entries(
+            PersistedTargetEntry,
+            order_by=PersistedTargetEntry.created_at.asc(),
+        )
+        return [entry.to_domain_model() for entry in entries]
 
     @abc.abstractmethod
     def _init_storage_io(self) -> None:
