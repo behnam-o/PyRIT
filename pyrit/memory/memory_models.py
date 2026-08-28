@@ -475,7 +475,7 @@ class PersistedTargetEntry(DomainBackedEntry[PersistedTarget]):
     target_registry_name: Mapped[str] = mapped_column(String(512), nullable=False, unique=True)
     target_type: Mapped[str] = mapped_column(String(128), nullable=False)
     parameters: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
-    auth_mode: Mapped[str] = mapped_column(String(16), nullable=False)
+    auth_mode: Mapped[Literal["api_key", "identity"]] = mapped_column(String(16), nullable=False)
     secret_name: Mapped[str | None] = mapped_column(String(127), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 

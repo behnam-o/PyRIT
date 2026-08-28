@@ -171,9 +171,7 @@ class TargetService:
             items=items,
             persistence=TargetPersistenceStatus(
                 definitions_enabled=self._definition_persistence_enabled,
-                api_keys_enabled=bool(
-                    self._definition_persistence_enabled and self._target_secret_key_vault_url
-                ),
+                api_keys_enabled=bool(self._definition_persistence_enabled and self._target_secret_key_vault_url),
             ),
         )
 

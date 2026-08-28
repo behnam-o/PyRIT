@@ -812,7 +812,7 @@ class TestTargetRoutes:
                             "target_type": "OpenAIChatTarget",
                             "supported_auth_modes": ["api_key", "identity"],
                         }
-                    ]
+                    ],
                 )
             )
             mock_get_service.return_value = mock_service
