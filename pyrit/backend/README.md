@@ -22,6 +22,14 @@ The API will be available at `http://localhost:8000`
 - ReDoc: `http://localhost:8000/redoc`
 - OpenAPI JSON: `http://localhost:8000/openapi.json`
 
+### MCP
+
+Every OpenAPI operation is also exposed as an MCP tool over Streamable HTTP:
+
+- MCP endpoint: `http://localhost:8000/mcp/`
+
+Tool names and input schemas are generated from the existing REST operation IDs and request models.
+
 ## API Endpoints
 
 ### Health & Status

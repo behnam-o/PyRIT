@@ -19,6 +19,7 @@ from starlette.responses import Response
 from starlette.types import Scope
 
 import pyrit
+from pyrit.backend.mcp_server import mount_mcp_server
 from pyrit.backend.middleware import RequestIdMiddleware, SecurityHeadersMiddleware, register_error_handlers
 from pyrit.backend.middleware.auth import EntraAuthMiddleware
 from pyrit.backend.models.initializers import BaselineInitializerSetting
@@ -89,7 +90,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # don't emit noise and don't perform filesystem side effects.
     setup_frontend()
 
-    yield
+    async with mcp_http_app.lifespan():
+        yield
 
 
 app = FastAPI(
@@ -142,6 +144,9 @@ app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(media.router, prefix="/api", tags=["media"])
 app.include_router(version.router, tags=["version"])
+
+# Derive MCP tools only after every REST route has been registered.
+mcp_server, mcp_http_app = mount_mcp_server(app)
 
 
 class SPAStaticFiles(StaticFiles):

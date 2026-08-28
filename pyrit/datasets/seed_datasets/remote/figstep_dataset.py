@@ -634,7 +634,7 @@ class _FigStepDataset(_RemoteDatasetLoader):
 
         if cache and await asyncio.to_thread(cache_path.exists):
             async with aiofiles.open(cache_path, encoding="utf-8") as cache_file:
-                text = await cache_file.read()
+                text: str = await cache_file.read()
         else:
             logger.info(f"[FigStep] Fetching benign sentences from {self.BENIGN_SENTENCES_URL}")
             response = await make_request_and_raise_if_error_async(

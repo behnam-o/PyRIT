@@ -45,6 +45,7 @@ dependencies = [
     "datasets>=4.8.0",
     "exceptiongroup>=1.2.0; python_version < '3.11'",
     "fastapi>=0.133.0",
+    "fastmcp>=2.12.0,<3.0.0",
     "httpx[http2]>=0.27.2",
     "jinja2>=3.1.6",
     "numpy>=1.26.0; python_version < '3.14'",
@@ -191,7 +192,7 @@ all = "error"
 # Annotating those generics is real code work, so keep the rule deferred until
 # that numpy-generics debt is addressed.
 missing-type-argument = "ignore"
-unsound-assignment = "ignore"
+invalid-assignment = "ignore"
 # unused-type-ignore-comment is environment-dependent: a `# type: ignore`
 # on an optional-dependency import (torch, playwright, etc.) is "used" when the
 # extra is not installed but "unused" once it is. CI installs `--extra all`, so

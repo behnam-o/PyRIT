@@ -85,7 +85,8 @@ class DiskStorageIO(StorageIO):
         """
         path = self._convert_to_path(path)
         async with aiofiles.open(path, "rb") as file:
-            return await file.read()
+            content: bytes = await file.read()
+            return content
 
     async def write_file_async(self, path: Path | str, data: bytes) -> None:
         """
