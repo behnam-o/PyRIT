@@ -80,6 +80,10 @@ class TestConfigurationLoader:
         with pytest.raises(ValueError, match="Invalid memory_db_type"):
             ConfigurationLoader(memory_db_type="InvalidType")
 
+    def test_empty_target_secret_key_vault_url_raises_error(self) -> None:
+        with pytest.raises(ValueError, match="must be a non-empty Azure Key Vault URL"):
+            ConfigurationLoader(target_secret_key_vault_url=" ")
+
     def test_initializer_as_string(self):
         """Test initializers specified as simple strings."""
         config = ConfigurationLoader(initializers=["simple", "airt"])

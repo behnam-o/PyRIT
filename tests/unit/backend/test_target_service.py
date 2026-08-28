@@ -53,6 +53,16 @@ def _mock_prompt_target(*, identifier: ComponentIdentifier | None = None) -> Mag
     return mock_target
 
 
+def _mock_key_vault_clients() -> tuple[MagicMock, MagicMock]:
+    credential = MagicMock()
+    credential.__aenter__ = AsyncMock(return_value=credential)
+    credential.__aexit__ = AsyncMock(return_value=None)
+    client = MagicMock()
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=None)
+    return credential, client
+
+
 async def _test_token_provider() -> str:
     """Shared async token provider used in Entra authentication tests."""
     return "test-token"
@@ -489,6 +499,19 @@ class TestCreateTarget:
 
 
 class TestRestorePersistedTargets:
+    async def test_restore_returns_when_definition_persistence_is_disabled(self) -> None:
+        memory = MagicMock(spec=MemoryInterface)
+        service = TargetService()
+        service.configure_persistence(
+            memory=memory,
+            definitions_enabled=False,
+            target_secret_key_vault_url=None,
+        )
+
+        await service.restore_persisted_targets_async()
+
+        memory.get_persisted_targets.assert_not_called()
+
     async def test_restore_recreates_target_with_stored_registry_name(self) -> None:
         memory = MagicMock(spec=MemoryInterface)
         memory.get_persisted_targets.return_value = [
@@ -539,6 +562,128 @@ class TestRestorePersistedTargets:
         }
         assert service.get_target_object(target_registry_name="saved-target") is target
 
+    async def test_restore_identity_target_omits_stored_api_key(self) -> None:
+        memory = MagicMock(spec=MemoryInterface)
+        memory.get_persisted_targets.return_value = [
+            PersistedTarget(
+                target_registry_name="saved-identity-target",
+                target_type="MockPromptTarget",
+                parameters={"api_key": "must-not-be-used"},
+                auth_mode="identity",
+            )
+        ]
+        service = TargetService()
+        service.configure_persistence(
+            memory=memory,
+            definitions_enabled=True,
+            target_secret_key_vault_url=None,
+        )
+        target = _mock_prompt_target()
+
+        with patch.object(service._registry, "create_instance", return_value=target) as create:
+            await service.restore_persisted_targets_async()
+
+        create.assert_called_once_with("MockPromptTarget")
+
+    async def test_restore_continues_after_one_target_fails(self) -> None:
+        memory = MagicMock(spec=MemoryInterface)
+        memory.get_persisted_targets.return_value = [
+            PersistedTarget(
+                target_registry_name="broken-target",
+                target_type="BrokenTarget",
+            ),
+            PersistedTarget(
+                target_registry_name="saved-target",
+                target_type="MockPromptTarget",
+            ),
+        ]
+        service = TargetService()
+        service.configure_persistence(
+            memory=memory,
+            definitions_enabled=True,
+            target_secret_key_vault_url=None,
+        )
+        target = _mock_prompt_target()
+
+        with patch.object(
+            service._registry,
+            "create_instance",
+            side_effect=[ValueError("broken definition"), target],
+        ):
+            await service.restore_persisted_targets_async()
+
+        assert service.get_target_object(target_registry_name="saved-target") is target
+
+
+class TestTargetSecretKeyVault:
+    async def test_key_vault_helpers_require_configuration(self) -> None:
+        service = TargetService()
+
+        with pytest.raises(RuntimeError, match="not configured"):
+            await service._set_api_key_async(secret_name="secret", api_key="value")
+        with pytest.raises(RuntimeError, match="not configured"):
+            await service._get_api_key_async(secret_name="secret")
+
+    async def test_set_api_key_writes_secret(self) -> None:
+        service = TargetService()
+        service.configure_persistence(
+            memory=MagicMock(spec=MemoryInterface),
+            definitions_enabled=True,
+            target_secret_key_vault_url="https://test.vault.azure.net",
+        )
+        credential, client = _mock_key_vault_clients()
+        client.set_secret = AsyncMock()
+
+        with (
+            patch("azure.identity.aio.DefaultAzureCredential", return_value=credential),
+            patch("azure.keyvault.secrets.aio.SecretClient", return_value=client) as client_class,
+        ):
+            await service._set_api_key_async(secret_name="saved-secret", api_key="saved-key")
+
+        client_class.assert_called_once_with(
+            vault_url="https://test.vault.azure.net",
+            credential=credential,
+        )
+        client.set_secret.assert_awaited_once_with("saved-secret", "saved-key")
+
+    async def test_get_api_key_reads_secret(self) -> None:
+        service = TargetService()
+        service.configure_persistence(
+            memory=MagicMock(spec=MemoryInterface),
+            definitions_enabled=True,
+            target_secret_key_vault_url="https://test.vault.azure.net",
+        )
+        credential, client = _mock_key_vault_clients()
+        client.get_secret = AsyncMock(return_value=MagicMock(value="saved-key"))
+
+        with (
+            patch("azure.identity.aio.DefaultAzureCredential", return_value=credential),
+            patch("azure.keyvault.secrets.aio.SecretClient", return_value=client),
+        ):
+            result = await service._get_api_key_async(secret_name="saved-secret")
+
+        assert result == "saved-key"
+        client.get_secret.assert_awaited_once_with("saved-secret")
+
+    async def test_get_api_key_rejects_secret_without_value(self) -> None:
+        service = TargetService()
+        service.configure_persistence(
+            memory=MagicMock(spec=MemoryInterface),
+            definitions_enabled=True,
+            target_secret_key_vault_url="https://test.vault.azure.net",
+        )
+        credential, client = _mock_key_vault_clients()
+        client.get_secret = AsyncMock(return_value=MagicMock(value=None))
+
+        with (
+            patch("azure.identity.aio.DefaultAzureCredential", return_value=credential),
+            patch("azure.keyvault.secrets.aio.SecretClient", return_value=client),
+            pytest.raises(ValueError, match="has no value"),
+        ):
+            await service._get_api_key_async(secret_name="empty-secret")
+
+
+class TestCreateTargetModelIdentity:
     async def test_create_target_model_name_not_overridden_by_env_var(self, sqlite_instance) -> None:
         """Test that explicit model_name is not overridden by underlying_model env var."""
         with patch.dict(os.environ, {"OPENAI_CHAT_UNDERLYING_MODEL": "gpt-4o"}):
