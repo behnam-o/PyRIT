@@ -409,6 +409,13 @@ export default function TargetTable({ targets, activeTarget, onSetActiveTarget }
       )}
 
       <div className={styles.filterRow}>
+        <Checkbox
+          checked={showHiddenTargets && hiddenTargetCount > 0}
+          disabled={hiddenTargetCount === 0}
+          label={`Show hidden targets (${hiddenTargetCount})`}
+          onChange={(_, data) => setShowHiddenTargets(data.checked === true)}
+          data-testid="show-hidden-targets"
+        />
         {targetTypes.length > 1 && (
           <>
             <label htmlFor={typeFilterId}>
@@ -427,14 +434,6 @@ export default function TargetTable({ targets, activeTarget, onSetActiveTarget }
             </Select>
           </>
         )}
-        <Checkbox
-          className={styles.hiddenTargetsToggle}
-          checked={showHiddenTargets && hiddenTargetCount > 0}
-          disabled={hiddenTargetCount === 0}
-          label={`Show hidden targets (${hiddenTargetCount})`}
-          onChange={(_, data) => setShowHiddenTargets(data.checked === true)}
-          data-testid="show-hidden-targets"
-        />
       </div>
 
       <Table aria-label="Target instances" className={styles.table}>

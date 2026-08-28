@@ -113,9 +113,6 @@ export const useTargetTableStyles = makeStyles({
       },
     },
   },
-  hiddenTargetsToggle: {
-    marginLeft: 'auto',
-  },
   actionCell: {
     width: '220px',
   },
