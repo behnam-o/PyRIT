@@ -476,7 +476,7 @@ class PersistedTargetEntry(DomainBackedEntry[PersistedTarget]):
     target_type: Mapped[str] = mapped_column(String(128), nullable=False)
     parameters: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     auth_mode: Mapped[Literal["api_key", "identity"]] = mapped_column(String(16), nullable=False)
-    secret_name: Mapped[str | None] = mapped_column(String(127), nullable=True)
+    secret_uri: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     @classmethod
@@ -493,7 +493,7 @@ class PersistedTargetEntry(DomainBackedEntry[PersistedTarget]):
             target_type=domain_model.target_type,
             parameters=domain_model.parameters,
             auth_mode=domain_model.auth_mode,
-            secret_name=domain_model.secret_name,
+            secret_uri=domain_model.secret_uri,
             created_at=domain_model.created_at,
         )
 
@@ -513,7 +513,7 @@ class PersistedTargetEntry(DomainBackedEntry[PersistedTarget]):
             target_type=self.target_type,
             parameters=self.parameters,
             auth_mode=self.auth_mode,
-            secret_name=self.secret_name,
+            secret_uri=self.secret_uri,
             created_at=created_at,
         )
 

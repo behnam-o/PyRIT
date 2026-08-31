@@ -27,6 +27,7 @@ from pyrit.backend.models.targets import (
     TargetListResponse,
     TargetPersistenceStatus,
 )
+from pyrit.common.key_vault import parse_key_vault_secret_uri
 from pyrit.memory.memory_interface import MemoryInterface
 from pyrit.models.catalog.target import TargetInstance
 from pyrit.models.persisted_target import PersistedTarget
@@ -232,8 +233,8 @@ class TargetService:
         for definition in definitions:
             try:
                 params: dict[str, Any] = dict(definition.parameters)
-                if definition.secret_name:
-                    params["api_key"] = await self._get_api_key_async(secret_name=definition.secret_name)
+                if definition.secret_uri:
+                    params["api_key"] = await self._get_api_key_async(secret_uri=definition.secret_uri)
                 if definition.auth_mode == "identity":
                     params.pop("api_key", None)
                 target_obj = self._registry.create_instance(definition.target_type, **params)
@@ -263,8 +264,9 @@ class TargetService:
 
         target_id = str(uuid5(NAMESPACE_URL, f"pyrit-target:{target_registry_name}"))
         secret_name = f"pyrit-target-{target_id}" if api_key is not None else None
+        secret_uri = None
         if secret_name:
-            await self._set_api_key_async(secret_name=secret_name, api_key=str(api_key))
+            secret_uri = await self._set_api_key_async(secret_name=secret_name, api_key=str(api_key))
 
         definition = PersistedTarget(
             id=target_id,
@@ -272,12 +274,17 @@ class TargetService:
             target_type=request.type,
             parameters=persisted_params,
             auth_mode=request.auth_mode,
-            secret_name=secret_name,
+            secret_uri=secret_uri,
         )
         await asyncio.to_thread(self._memory.add_persisted_target, target=definition)
 
-    async def _set_api_key_async(self, *, secret_name: str, api_key: str) -> None:
-        """Store one API key in the configured Azure Key Vault."""
+    async def _set_api_key_async(self, *, secret_name: str, api_key: str) -> str:
+        """
+        Store one API key in the configured Azure Key Vault.
+
+        Returns:
+            The versionless URI of the stored secret.
+        """
         if not self._target_secret_key_vault_url:
             raise RuntimeError("Target secret Key Vault is not configured.")
 
@@ -290,28 +297,27 @@ class TargetService:
                 credential=credential,
             ) as client:
                 await client.set_secret(secret_name, api_key)
+        return f"{self._target_secret_key_vault_url}/secrets/{secret_name}"
 
-    async def _get_api_key_async(self, *, secret_name: str) -> str:
+    async def _get_api_key_async(self, *, secret_uri: str) -> str:
         """
-        Load one API key from the configured Azure Key Vault.
+        Load one API key from its persisted Azure Key Vault secret URI.
 
         Returns:
             str: The stored API key.
         """
-        if not self._target_secret_key_vault_url:
-            raise RuntimeError("Target secret Key Vault is not configured.")
-
         from azure.identity.aio import DefaultAzureCredential
         from azure.keyvault.secrets.aio import SecretClient
 
+        vault_url, secret_name, secret_version = parse_key_vault_secret_uri(secret_uri)
         async with DefaultAzureCredential() as credential:
             async with SecretClient(
-                vault_url=self._target_secret_key_vault_url,
+                vault_url=vault_url,
                 credential=credential,
             ) as client:
-                secret = await client.get_secret(secret_name)
+                secret = await client.get_secret(secret_name, version=secret_version)
         if secret.value is None:
-            raise ValueError(f"Azure Key Vault secret '{secret_name}' has no value.")
+            raise ValueError(f"Azure Key Vault secret '{secret_uri}' has no value.")
         return secret.value
 
 

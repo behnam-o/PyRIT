@@ -30,7 +30,7 @@ def upgrade() -> None:
         sa.Column("target_type", sa.String(length=128), nullable=False),
         sa.Column("parameters", sa.JSON(), nullable=False),
         sa.Column("auth_mode", sa.String(length=16), nullable=False),
-        sa.Column("secret_name", sa.String(length=127), nullable=True),
+        sa.Column("secret_uri", sa.String(length=512), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("target_registry_name"),

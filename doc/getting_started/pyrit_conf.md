@@ -185,8 +185,9 @@ Ordinary malformed dotenv lines retain python-dotenv's permissive behavior. `env
 
 Optional Azure Key Vault URL for API keys submitted when users create targets through the backend UI or REST API.
 Non-secret target settings are stored in the configured memory database, while API keys are stored in this vault
-using `DefaultAzureCredential`. Without this setting, a target created with an explicit API key is memory-only and
-the UI warns that it will be cleared when the backend restarts.
+using `DefaultAzureCredential`. The persisted target definition retains the versionless secret URI, so restoration
+does not depend on this setting remaining in the current configuration. Without this setting when creating a target,
+an explicit API key is memory-only and the UI warns that it will be cleared when the backend restarts.
 
 ```yaml
 target_secret_key_vault_url: https://my-vault.vault.azure.net

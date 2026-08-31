@@ -23,7 +23,10 @@ class PersistedTarget(BaseModel):
         description="JSON-serializable constructor parameters with secrets removed.",
     )
     auth_mode: Literal["api_key", "identity"] = Field(default="api_key", description="Target authentication mode.")
-    secret_name: str | None = Field(default=None, description="Azure Key Vault secret name containing the API key.")
+    secret_uri: str | None = Field(
+        default=None,
+        description="Versionless Azure Key Vault secret URI containing the API key.",
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="Creation time used to restore dependent targets in order.",

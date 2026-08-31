@@ -13,7 +13,7 @@ def test_persisted_target_round_trips_without_api_key(sqlite_instance) -> None:
             "endpoint": "https://example.openai.azure.com",
             "model_name": "gpt-4o",
         },
-        secret_name="pyrit-target-secret",
+        secret_uri="https://targets.vault.azure.net/secrets/pyrit-target-secret",
     )
 
     sqlite_instance.add_persisted_target(target=target)

@@ -476,7 +476,11 @@ class TestCreateTarget:
             target_secret_key_vault_url="https://test.vault.azure.net",
         )
 
-        with patch.object(service, "_set_api_key_async", new=AsyncMock()) as set_secret:
+        with patch.object(
+            service,
+            "_set_api_key_async",
+            new=AsyncMock(return_value="https://test.vault.azure.net/secrets/saved-secret"),
+        ) as set_secret:
             await service.create_target_async(
                 request=CreateTargetRequest(
                     type="OpenAIChatTarget",
@@ -495,7 +499,7 @@ class TestCreateTarget:
             "endpoint": "https://test.openai.azure.com/",
             "model_name": "gpt-4o",
         }
-        assert persisted.secret_name is not None
+        assert persisted.secret_uri == "https://test.vault.azure.net/secrets/saved-secret"
 
 
 class TestRestorePersistedTargets:
@@ -531,30 +535,35 @@ class TestRestorePersistedTargets:
 
         assert service.get_target_object(target_registry_name="saved-text-target") is not None
 
-    async def test_restore_resolves_api_key_from_key_vault(self) -> None:
+    async def test_restore_resolves_api_key_without_vault_configuration(self) -> None:
         memory = MagicMock(spec=MemoryInterface)
         memory.get_persisted_targets.return_value = [
             PersistedTarget(
                 target_registry_name="saved-target",
                 target_type="MockPromptTarget",
                 parameters={"endpoint": "https://example.test"},
-                secret_name="saved-secret",
+                secret_uri="https://test.vault.azure.net/secrets/saved-secret",
             )
         ]
         service = TargetService()
         service.configure_persistence(
             memory=memory,
             definitions_enabled=True,
-            target_secret_key_vault_url="https://test.vault.azure.net",
+            target_secret_key_vault_url=None,
         )
         target = _mock_prompt_target()
 
         with (
-            patch.object(service, "_get_api_key_async", new=AsyncMock(return_value="restored-key")),
+            patch.object(
+                service,
+                "_get_api_key_async",
+                new=AsyncMock(return_value="restored-key"),
+            ) as get_secret,
             patch.object(service._registry, "create_instance", return_value=target) as create,
         ):
             await service.restore_persisted_targets_async()
 
+        get_secret.assert_awaited_once_with(secret_uri="https://test.vault.azure.net/secrets/saved-secret")
         assert create.call_args.args == ("MockPromptTarget",)
         assert create.call_args.kwargs == {
             "endpoint": "https://example.test",
@@ -621,8 +630,6 @@ class TestTargetSecretKeyVault:
 
         with pytest.raises(RuntimeError, match="not configured"):
             await service._set_api_key_async(secret_name="secret", api_key="value")
-        with pytest.raises(RuntimeError, match="not configured"):
-            await service._get_api_key_async(secret_name="secret")
 
     async def test_set_api_key_writes_secret(self) -> None:
         service = TargetService()
@@ -638,8 +645,9 @@ class TestTargetSecretKeyVault:
             patch("azure.identity.aio.DefaultAzureCredential", return_value=credential),
             patch("azure.keyvault.secrets.aio.SecretClient", return_value=client) as client_class,
         ):
-            await service._set_api_key_async(secret_name="saved-secret", api_key="saved-key")
+            secret_uri = await service._set_api_key_async(secret_name="saved-secret", api_key="saved-key")
 
+        assert secret_uri == "https://test.vault.azure.net/secrets/saved-secret"
         client_class.assert_called_once_with(
             vault_url="https://test.vault.azure.net",
             credential=credential,
@@ -648,22 +656,23 @@ class TestTargetSecretKeyVault:
 
     async def test_get_api_key_reads_secret(self) -> None:
         service = TargetService()
-        service.configure_persistence(
-            memory=MagicMock(spec=MemoryInterface),
-            definitions_enabled=True,
-            target_secret_key_vault_url="https://test.vault.azure.net",
-        )
         credential, client = _mock_key_vault_clients()
         client.get_secret = AsyncMock(return_value=MagicMock(value="saved-key"))
 
         with (
             patch("azure.identity.aio.DefaultAzureCredential", return_value=credential),
-            patch("azure.keyvault.secrets.aio.SecretClient", return_value=client),
+            patch("azure.keyvault.secrets.aio.SecretClient", return_value=client) as client_class,
         ):
-            result = await service._get_api_key_async(secret_name="saved-secret")
+            result = await service._get_api_key_async(
+                secret_uri="https://other-vault.vault.azure.net/secrets/saved-secret"
+            )
 
         assert result == "saved-key"
-        client.get_secret.assert_awaited_once_with("saved-secret")
+        client_class.assert_called_once_with(
+            vault_url="https://other-vault.vault.azure.net",
+            credential=credential,
+        )
+        client.get_secret.assert_awaited_once_with("saved-secret", version=None)
 
     async def test_get_api_key_rejects_secret_without_value(self) -> None:
         service = TargetService()
@@ -680,7 +689,7 @@ class TestTargetSecretKeyVault:
             patch("azure.keyvault.secrets.aio.SecretClient", return_value=client),
             pytest.raises(ValueError, match="has no value"),
         ):
-            await service._get_api_key_async(secret_name="empty-secret")
+            await service._get_api_key_async(secret_uri="https://test.vault.azure.net/secrets/empty-secret")
 
 
 class TestCreateTargetModelIdentity:

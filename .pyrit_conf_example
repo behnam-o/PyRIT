@@ -99,6 +99,7 @@ operation: op_trash_panda
 # Non-secret target settings are stored in the configured memory database.
 # Set this vault URL to persist API keys supplied through the backend UI/API.
 # The backend authenticates to Key Vault with DefaultAzureCredential.
+# Persisted definitions retain each versionless secret URI for config-independent restoration.
 # Without it, targets created with an explicit API key remain memory-only.
 # target_secret_key_vault_url: https://my-vault.vault.azure.net
 
