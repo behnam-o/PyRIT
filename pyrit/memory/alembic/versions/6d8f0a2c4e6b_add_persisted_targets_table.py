@@ -5,7 +5,7 @@
 Add persisted API-created targets table.
 
 Revision ID: 6d8f0a2c4e6b
-Revises: 6b8d0f2a4c1e
+Revises: 8e2c4a6b0d13
 Create Date: 2026-08-28 12:30:00.000000
 """
 
@@ -16,7 +16,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "6d8f0a2c4e6b"
-down_revision: str | None = "6b8d0f2a4c1e"
+down_revision: str | None = "8e2c4a6b0d13"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
