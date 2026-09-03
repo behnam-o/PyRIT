@@ -35,6 +35,9 @@ jest.mock("../../services/api", () => ({
     createConversation: jest.fn(),
     changeMainConversation: jest.fn(),
   },
+  scoresApi: {
+    createManualScore: jest.fn(),
+  },
   convertersApi: {
     listConverterCatalog: jest.fn(),
     listConverters: jest.fn(),

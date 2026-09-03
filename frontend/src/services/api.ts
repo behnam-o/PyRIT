@@ -38,6 +38,8 @@ import type {
   EnvironmentFileListResponse,
   UpdateConfigurationFileRequest,
   AuthAccess,
+  BackendScore,
+  ManualScoreRequest,
 } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
@@ -356,6 +358,13 @@ export const attacksApi = {
 
   getConverterOptions: async (): Promise<{ converter_types: string[] }> => {
     const response = await apiClient.get('/attacks/converter-options')
+    return response.data
+  },
+}
+
+export const scoresApi = {
+  createManualScore: async (request: ManualScoreRequest): Promise<BackendScore> => {
+    const response = await apiClient.post('/scores/manual', request)
     return response.data
   },
 }

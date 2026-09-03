@@ -7,6 +7,8 @@ import {
   MessageBarBody,
   Button,
   Badge,
+  Field,
+  Input,
   Menu,
   MenuItem,
   MenuList,
@@ -19,6 +21,7 @@ import {
   TabList,
   Tooltip,
   Spinner,
+  Textarea,
   mergeClasses,
 } from '@fluentui/react-components'
 import {
@@ -27,6 +30,7 @@ import {
   ArrowReplyRegular,
   BranchForkRegular,
   ChatAddRegular,
+  GaugeRegular,
   MoreHorizontalRegular,
   OpenRegular,
 } from '@fluentui/react-icons'
@@ -57,6 +61,8 @@ interface MessageListProps {
   noTargetSelected?: boolean
   /** Conversation-wide default: render message text as Markdown. */
   globalMarkdown?: boolean
+  /** Persist a manual score for a message piece. */
+  onManualScore?: (messageId: string, value: number, rationale: string) => Promise<void>
 }
 
 /** Image that shows a spinner while loading. */
@@ -111,6 +117,105 @@ function scoreDisplayValue(score: DisplayScore): string {
 
 function scoreDisplayLabel(score: DisplayScore): string {
   return `Score: ${scoreDisplayValue(score)}`
+}
+
+const MANUAL_SCORE_PRESETS = [0, 0.25, 0.33, 0.5, 0.66, 0.75, 1]
+
+interface ManualScorePopoverProps {
+  messageId: string
+  onSave: (messageId: string, value: number, rationale: string) => Promise<void>
+}
+
+function ManualScorePopover({ messageId, onSave }: ManualScorePopoverProps) {
+  const styles = useMessageListStyles()
+  const [isOpen, setIsOpen] = useState(false)
+  const [value, setValue] = useState('0.5')
+  const [rationale, setRationale] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState('')
+  const numericValue = Number(value)
+  const isValueValid = value.trim() !== '' && Number.isFinite(numericValue) && numericValue >= 0 && numericValue <= 1
+
+  const handleSave = async () => {
+    if (!isValueValid) return
+
+    setIsSaving(true)
+    setError('')
+    try {
+      await onSave(messageId, numericValue, rationale)
+      setIsOpen(false)
+      setRationale('')
+    } catch {
+      setError('Unable to save the manual score.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <Popover
+      withArrow
+      open={isOpen}
+      onOpenChange={(_event: unknown, data: { open: boolean }) => {
+        setIsOpen(data.open)
+        if (!data.open) setError('')
+      }}
+    >
+      <Tooltip content="Add manual score" relationship="label">
+        <PopoverTrigger disableButtonEnhancement>
+          <Button
+            appearance="subtle"
+            size="small"
+            icon={<GaugeRegular />}
+            aria-label="Add manual score"
+            className={styles.messageActionButton}
+          />
+        </PopoverTrigger>
+      </Tooltip>
+      <PopoverSurface className={styles.manualScorePopover}>
+        <Text weight="semibold">Manual score</Text>
+        <div className={styles.manualScorePresets} aria-label="Score presets">
+          {MANUAL_SCORE_PRESETS.map((preset) => (
+            <Button key={preset} size="small" onClick={() => setValue(String(preset))}>
+              {preset}
+            </Button>
+          ))}
+        </div>
+        <Field
+          label="Value"
+          validationState={value && !isValueValid ? 'error' : 'none'}
+          validationMessage={value && !isValueValid ? 'Enter a number from 0 to 1.' : undefined}
+        >
+          <Input
+            type="number"
+            min={0}
+            max={1}
+            step="any"
+            value={value}
+            onChange={(_event, data) => setValue(data.value)}
+            aria-label="Manual score value"
+          />
+        </Field>
+        <Field label="Rationale">
+          <Textarea
+            value={rationale}
+            onChange={(_event, data) => setRationale(data.value)}
+            aria-label="Manual score rationale"
+            resize="vertical"
+          />
+        </Field>
+        {error && <Text role="alert">{error}</Text>}
+        <div className={styles.manualScoreActions}>
+          <Button appearance="secondary" onClick={() => setIsOpen(false)} disabled={isSaving}>
+            Cancel
+          </Button>
+          <Button appearance="primary" onClick={handleSave} disabled={!isValueValid || isSaving}>
+            {isSaving ? 'Saving...' : 'Save'}
+          </Button>
+        </div>
+      </PopoverSurface>
+    </Popover>
+  )
 }
 
 function ScoreDetails({ score, testId }: { score: DisplayScore; testId: string }) {
@@ -541,7 +646,7 @@ function getRenderMessagePieces(message: Message, messageIndex: number): RenderM
   return pieces
 }
 
-export default function MessageList({ messages, onCopyToInput, onCopyToNewConversation, onBranchConversation, onBranchAttack, isLoading, isSingleTurn, isOperatorLocked, isCrossTarget, noTargetSelected, globalMarkdown = false }: MessageListProps) {
+export default function MessageList({ messages, onCopyToInput, onCopyToNewConversation, onBranchConversation, onBranchAttack, isLoading, isSingleTurn, isOperatorLocked, isCrossTarget, noTargetSelected, globalMarkdown = false, onManualScore }: MessageListProps) {
   const styles = useMessageListStyles()
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -698,9 +803,14 @@ export default function MessageList({ messages, onCopyToInput, onCopyToNewConver
                           ) : (
                             <Text className={styles.messageText}>{piece.content}</Text>
                           )}
-                          {piece.scores && piece.scores.length > 0 && (
-                            <MessageScores scores={piece.scores} groupId={groupId} />
-                          )}
+                          <div className={styles.scoreControls}>
+                            {piece.scores && piece.scores.length > 0 && (
+                              <MessageScores scores={piece.scores} groupId={groupId} />
+                            )}
+                            {message.displayPieces && onManualScore && (
+                              <ManualScorePopover messageId={piece.pieceId} onSave={onManualScore} />
+                            )}
+                          </div>
                         </div>
                       )
                     }
@@ -747,9 +857,14 @@ export default function MessageList({ messages, onCopyToInput, onCopyToNewConver
                             )}
                           </div>
                         )}
-                        {piece.scores && piece.scores.length > 0 && (
-                          <MessageScores scores={piece.scores} groupId={groupId} />
-                        )}
+                        <div className={styles.scoreControls}>
+                          {piece.scores && piece.scores.length > 0 && (
+                            <MessageScores scores={piece.scores} groupId={groupId} />
+                          )}
+                          {message.displayPieces && onManualScore && (
+                            <ManualScorePopover messageId={piece.pieceId} onSave={onManualScore} />
+                          )}
+                        </div>
                       </div>
                     )
                   })}

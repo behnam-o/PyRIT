@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FluentProvider, webLightTheme } from "@fluentui/react-components";
 import MessageList from "./MessageList";
@@ -115,6 +115,43 @@ describe("MessageList", () => {
     );
 
     expect(screen.getByText("Assistant message test")).toBeInTheDocument();
+  });
+
+  it("should submit a manual score for a persisted message piece", async () => {
+    const user = userEvent.setup();
+    const onManualScore = jest.fn().mockResolvedValue(undefined);
+    const messages: Message[] = [
+      {
+        role: "assistant",
+        content: "Response to score",
+        timestamp: new Date().toISOString(),
+        displayPieces: [
+          {
+            type: "text",
+            pieceId: "piece-manual",
+            pieceIndex: 0,
+            content: "Response to score",
+            scores: [],
+          },
+        ],
+      },
+    ];
+
+    render(
+      <TestWrapper>
+        <MessageList messages={messages} onManualScore={onManualScore} />
+      </TestWrapper>
+    );
+
+    await user.click(screen.getByRole("button", { name: "Add manual score" }));
+    await user.click(screen.getByRole("button", { name: "0.33" }));
+    await user.type(screen.getByLabelText("Manual score rationale"), "Partially satisfied");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(onManualScore).toHaveBeenCalledWith("piece-manual", 0.33, "Partially satisfied");
+    });
+    expect(screen.queryByText("Manual score")).not.toBeInTheDocument();
   });
 
   it("should show the message score and its details when present", async () => {

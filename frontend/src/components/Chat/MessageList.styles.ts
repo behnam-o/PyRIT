@@ -101,6 +101,29 @@ export const useMessageListStyles = makeStyles({
     flexShrink: 0,
     alignSelf: 'flex-end',
   },
+  scoreControls: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    gap: tokens.spacingHorizontalXXS,
+  },
+  manualScorePopover: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
+    width: 'min(320px, calc(100vw - 32px))',
+  },
+  manualScorePresets: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: tokens.spacingHorizontalXXS,
+  },
+  manualScoreActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: tokens.spacingHorizontalS,
+  },
   scoreChip: {
     minWidth: '32px',
     maxWidth: 'min(160px, calc(100vw - 64px))',

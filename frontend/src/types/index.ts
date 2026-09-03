@@ -343,6 +343,12 @@ export interface BackendScore {
   timestamp: string
 }
 
+export interface ManualScoreRequest {
+  message_id: string
+  value: number
+  rationale: string
+}
+
 /** Score enriched with message-piece presentation fields for transcript rendering. */
 export interface DisplayScore extends BackendScore {
   pieceIndex: number

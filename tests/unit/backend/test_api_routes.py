@@ -8,6 +8,7 @@ Tests for backend API routes.
 import json
 import os
 import tempfile
+import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -40,7 +41,7 @@ from pyrit.backend.models.targets import (
 )
 from pyrit.backend.routes import version as version_routes
 from pyrit.backend.routes.labels import get_label_options
-from pyrit.models import ConverterIdentifier, MessagePiece, TargetCapabilities, TargetIdentifier
+from pyrit.models import ConverterIdentifier, MessagePiece, Score, TargetCapabilities, TargetIdentifier
 from pyrit.models.catalog.target import TargetInstance
 
 
@@ -1339,6 +1340,74 @@ class TestVersionRoutes:
         assert "version" in data
         assert data["source"] is None
         assert data["commit"] is None
+
+
+class TestScoreRoutes:
+    """Tests for score API routes."""
+
+    def test_create_manual_score(self, client: TestClient) -> None:
+        """Test creating and persisting a manual score."""
+        message_id = uuid.uuid4()
+        score = Score(
+            score_value="0.75",
+            score_type="float_scale",
+            score_rationale="Mostly satisfied",
+            message_piece_id=message_id,
+        )
+
+        with (
+            patch("pyrit.backend.routes.scores.CentralMemory") as mock_memory_class,
+            patch("pyrit.backend.routes.scores.ManualScorer") as mock_manual_scorer_class,
+        ):
+            mock_memory_class.get_memory_instance.return_value.get_message_pieces.return_value = [
+                MagicMock(id=message_id)
+            ]
+            mock_scorer = mock_manual_scorer_class.return_value
+            mock_scorer.score_async = AsyncMock(return_value=[score])
+
+            response = client.post(
+                "/api/scores/manual",
+                json={
+                    "message_id": str(message_id),
+                    "value": 0.75,
+                    "rationale": "Mostly satisfied",
+                },
+            )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.json()["score_value"] == "0.75"
+        assert response.json()["score_rationale"] == "Mostly satisfied"
+        mock_manual_scorer_class.assert_called_once_with(value=0.75, rationale="Mostly satisfied")
+        scorable = mock_scorer.score_async.await_args.kwargs["scorable"]
+        assert scorable.message_piece_ids == (message_id,)
+
+    def test_create_manual_score_message_not_found(self, client: TestClient) -> None:
+        """Test that a missing message returns 404 without running the scorer."""
+        message_id = uuid.uuid4()
+
+        with (
+            patch("pyrit.backend.routes.scores.CentralMemory") as mock_memory_class,
+            patch("pyrit.backend.routes.scores.ManualScorer") as mock_manual_scorer_class,
+        ):
+            mock_memory_class.get_memory_instance.return_value.get_message_pieces.return_value = []
+
+            response = client.post(
+                "/api/scores/manual",
+                json={"message_id": str(message_id), "value": 0.5, "rationale": ""},
+            )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        mock_manual_scorer_class.assert_not_called()
+
+    @pytest.mark.parametrize("value", [-0.01, 1.01])
+    def test_create_manual_score_rejects_value_outside_range(self, client: TestClient, value: float) -> None:
+        """Test request validation for the manual score range."""
+        response = client.post(
+            "/api/scores/manual",
+            json={"message_id": str(uuid.uuid4()), "value": value, "rationale": ""},
+        )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 # ============================================================================

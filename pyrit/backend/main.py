@@ -34,6 +34,7 @@ from pyrit.backend.routes import (
     labels,
     media,
     scenarios,
+    scores,
     targets,
     version,
 )
@@ -162,6 +163,7 @@ app.include_router(labels.router, prefix="/api", tags=["labels"])
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(media.router, prefix="/api", tags=["media"])
+app.include_router(scores.router, prefix="/api", tags=["scores"])
 app.include_router(version.router, tags=["version"])
 
 

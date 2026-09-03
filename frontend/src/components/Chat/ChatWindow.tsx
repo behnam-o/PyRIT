@@ -33,7 +33,7 @@ import type { PieceConversion } from './converterTypes'
 import { PIECE_TYPE_TO_DATA_TYPE, basenameFromValue, buildMediaUrl, dataTypeToAttachmentKind, isPathDataType } from './converterTypes'
 import LabelsBar from '../Labels/LabelsBar'
 import type { ChatInputAreaHandle } from './ChatInputArea'
-import { attacksApi } from '../../services/api'
+import { attacksApi, scoresApi } from '../../services/api'
 import { toApiError } from '../../services/errors'
 import { buildMessagePieces, backendMessagesToFrontend } from '../../utils/messageMapper'
 import { exportConversation } from '../../utils/conversationExport'
@@ -690,6 +690,17 @@ export default function ChatWindow({
     isMutationLocked,
   ])
 
+  const handleManualScore = useCallback(async (messageId: string, value: number, rationale: string) => {
+    if (!attackResultId || !activeConversationId || isMutationLocked) return
+
+    await scoresApi.createManualScore({
+      message_id: messageId,
+      value,
+      rationale,
+    })
+    await loadConversation(attackResultId, activeConversationId)
+  }, [activeConversationId, attackResultId, isMutationLocked, loadConversation])
+
   const singleTurnLimitReached = activeTarget?.capabilities?.supports_multi_turn === false && messages.some(m => m.role === 'user')
 
   // "Continue with your target" — clone the current conversation into a new attack
@@ -883,6 +894,7 @@ export default function ChatWindow({
           isCrossTarget={isCrossTargetLocked || isTargetResolutionLocked}
           noTargetSelected={!activeTarget}
           globalMarkdown={globalMarkdown}
+          onManualScore={!isMutationLocked && attackResultId ? handleManualScore : undefined}
         />
         <ChatInputArea
           ref={inputBoxRef}
