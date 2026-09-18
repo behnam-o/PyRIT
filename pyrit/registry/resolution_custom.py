@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-"""The registry's closed JSON contract for built-in word selection."""
+"""Custom constructor input resolution for built-in word selection."""
 
 import re
 from typing import Any, get_args

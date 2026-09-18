@@ -192,7 +192,7 @@ def _parameters_from_signature(
         list[Parameter]: Parameters declared by the constructor.
     """
     descriptions = _parse_arg_descriptions(owner)
-    from pyrit.registry.word_selection import word_selection_parameters
+    from pyrit.registry.resolution_custom import word_selection_parameters
 
     parameters: list[Parameter] = []
     for name, param in signature.parameters.items():
@@ -503,7 +503,7 @@ def resolve_constructor_args(
                 annotation=param.reference.annotation,
             )
         elif param.word_selection is not None:
-            from pyrit.registry.word_selection import resolve_word_selection
+            from pyrit.registry.resolution_custom import resolve_word_selection
 
             resolved[name] = resolve_word_selection(parameter=param, value=value)
         elif (isinstance(value, str) and param.is_string_coercible) or (
