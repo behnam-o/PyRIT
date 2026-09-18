@@ -230,6 +230,35 @@ describe('CreateConverterDialog', () => {
     })
   })
 
+  it.each(['str | list[str]', 'list[str] | str'])(
+    'should create SearchReplaceConverter with a string replacement for %s',
+    async (typeName) => {
+      const user = userEvent.setup()
+      mockConverterParameters([
+        { name: 'pattern', type_name: 'str', required: true },
+        { name: 'replace', type_name: typeName, required: true },
+        { name: 'regex_flags', type_name: 'int', required: false, default: '0' },
+      ], 'SearchReplaceConverter')
+      renderDialog()
+      await selectConverterType('SearchReplaceConverter')
+
+      const replacement = screen.getByRole('textbox', { name: 'replace *' })
+      expect(replacement).toBeEnabled()
+      await user.type(screen.getByRole('textbox', { name: 'pattern *' }), 'hello')
+      await user.click(screen.getByRole('button', { name: 'Add Converter' }))
+      expect(mockedConvertersApi.createConverter).not.toHaveBeenCalled()
+      expect(screen.getByText('Required')).toBeInTheDocument()
+
+      await user.type(replacement, 'world')
+      await user.click(screen.getByRole('button', { name: 'Add Converter' }))
+      expect(mockedConvertersApi.createConverter).toHaveBeenCalledWith({
+        name: 'SearchReplaceConverter',
+        type: 'SearchReplaceConverter',
+        params: { pattern: 'hello', replace: 'world', regex_flags: '0' },
+      })
+    },
+  )
+
   it('selects a registered target for a target reference parameter', async () => {
     mockedConvertersApi.listConverterTypes.mockResolvedValue({
       items: [
@@ -488,11 +517,16 @@ describe('CreateConverterDialog', () => {
     })
   })
 
-  it('should not expose unresolved annotations as editable strings', async () => {
+  it.each([
+    'Optional[UnknownStrategy]',
+    'UnknownStrategy',
+    'UnknownStrategy | OtherStrategy',
+    'dict[str, list[int | str | float]]',
+  ])('should not expose unsupported %s inputs as editable strings', async (typeName) => {
     const user = userEvent.setup()
     mockConverterParameters([{
       name: 'unresolved',
-      type_name: 'Optional[UnknownStrategy]',
+      type_name: typeName,
       required: false,
       default: 'UnknownStrategy()',
     }])

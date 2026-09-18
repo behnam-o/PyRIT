@@ -71,6 +71,13 @@ interface WordSelectionValue {
 }
 
 function isEditableParameter(parameter: Parameter): boolean {
+  let depth = 0
+  for (const part of parameter.type_name.split(/(\[|\]|\|)/)) {
+    if (part === '[') depth++
+    else if (part === ']') depth--
+    else if (depth === 0 && part.trim() === 'str') return true
+  }
+
   return Boolean(parameter.reference_type || parameter.choices?.length)
     || /^(str|int|float|bool|Path( \| str)?|list\[(str|int|float|bool)\])$/.test(parameter.type_name)
 }
