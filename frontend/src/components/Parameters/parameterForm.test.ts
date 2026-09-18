@@ -245,6 +245,18 @@ describe('buildParametersFromForm', () => {
     expect(result).toEqual({ ok: false, error: 'names is required.' })
   })
 
+  it.each([false, true])('preserves an explicit empty list (required: %s)', (required) => {
+    const params = [makeParameter({ name: 'names', type_name: 'list[str]', is_list: true, required })]
+    expect(buildParametersFromForm(params, { names: [] })).toEqual({
+      ok: true, parameters: { names: [] },
+    })
+  })
+
+  it('still omits an unset optional list', () => {
+    const params = [makeParameter({ name: 'names', type_name: 'list[str]', is_list: true })]
+    expect(buildParametersFromForm(params, { names: '' })).toEqual({ ok: true, parameters: null })
+  })
+
   it('reports a required multiselect with no selection', () => {
     const params = [
       makeParameter({ name: 'tags', type_name: 'list[str]', is_list: true, choices: ['a'], required: true }),

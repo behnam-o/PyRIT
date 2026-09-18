@@ -24,6 +24,12 @@ import {
 import { convertersApi, targetsApi } from '@/services/api'
 import { toApiError } from '@/services/errors'
 import type { ConverterInstance, ConverterTypeEntry, Parameter, TargetInstance } from '@/types'
+import ParameterField from '@/components/Parameters/ParameterField'
+import {
+  buildParametersFromForm,
+  getInitialFormValues,
+  type ParameterFormValue,
+} from '@/components/Parameters/parameterForm'
 
 import { useCreateConverterDialogStyles } from './Registry.styles'
 
@@ -57,6 +63,16 @@ interface ParameterInputProps {
   showError: boolean
   onChange: (value: string) => void
   onBrowse: () => void
+}
+
+interface WordSelectionValue {
+  type: string
+  values: Record<string, ParameterFormValue>
+}
+
+function isEditableParameter(parameter: Parameter): boolean {
+  return Boolean(parameter.reference_type || parameter.choices?.length)
+    || /^(str|int|float|bool|Path( \| str)?|list\[(str|int|float|bool)\])$/.test(parameter.type_name)
 }
 
 function parameterDefaultValue(parameter: Parameter): string {
@@ -122,7 +138,16 @@ function ParameterInput({
     )
   }
 
+  if (!isEditableParameter(parameter)) {
+    return (
+      <Field label={label} hint="This parameter cannot be configured here. Omit it to use the converter default.">
+        <Input disabled value="" />
+      </Field>
+    )
+  }
+
   const isFile = parameter.type_name === 'Path'
+    || parameter.type_name === 'Path | str'
     || /path|file/i.test(parameter.name)
     || /path|file/i.test(parameter.description ?? '')
 
@@ -137,7 +162,11 @@ function ParameterInput({
           <Input
             className={styles.fileInput}
             value={value}
-            placeholder={parameterDefaultValue(parameter) || 'Upload a file or enter a server path'}
+            placeholder={parameterDefaultValue(parameter) || (
+              parameter.type_name === 'Path | str'
+                ? 'Upload a file or enter a URL'
+                : 'Upload a file or enter a server path'
+            )}
             onChange={(_, data) => onChange(data.value)}
           />
           <Button type="button" onClick={onBrowse}>Upload</Button>
@@ -166,6 +195,7 @@ export default function CreateConverterDialog({
   const [registryName, setRegistryName] = useState('')
   const [nameEdited, setNameEdited] = useState(false)
   const [parameterValues, setParameterValues] = useState<Record<string, string>>({})
+  const [wordSelections, setWordSelections] = useState<Record<string, WordSelectionValue>>({})
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [showValidation, setShowValidation] = useState(false)
@@ -250,6 +280,7 @@ export default function CreateConverterDialog({
     setRegistryName('')
     setNameEdited(false)
     setParameterValues({})
+    setWordSelections({})
     setShowValidation(false)
     setError(null)
   }
@@ -266,10 +297,12 @@ export default function CreateConverterDialog({
     setParameterValues(
       Object.fromEntries(
         (typeEntry?.parameters ?? [])
-          .filter((parameter) => parameter.default != null)
+          .filter((parameter) => !parameter.word_selection
+            && isEditableParameter(parameter) && parameter.default != null)
           .map((parameter) => [parameter.name, parameterDefaultValue(parameter)]),
       ),
     )
+    setWordSelections({})
     setShowValidation(false)
     setError(null)
   }
@@ -296,11 +329,28 @@ export default function CreateConverterDialog({
     const missingParameters = (selectedConverterType?.parameters ?? []).some(
       (parameter) => parameter.required
         && !parameter.default
-        && !parameterValues[parameter.name]?.trim(),
+        && !(parameter.word_selection
+          ? wordSelections[parameter.name]?.type
+          : parameterValues[parameter.name]?.trim()),
     )
     if (!selectedType || !registryName.trim() || missingParameters) {
       setShowValidation(true)
       return
+    }
+
+    const params: Record<string, unknown> = { ...parameterValues }
+    for (const parameter of selectedConverterType?.parameters ?? []) {
+      const selection = wordSelections[parameter.name]
+      if (!parameter.word_selection || !selection?.type) continue
+      const result = buildParametersFromForm(
+        parameter.word_selection[selection.type],
+        selection.values,
+      )
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+      params[parameter.name] = { type: selection.type, parameters: result.parameters ?? {} }
     }
 
     setSubmitting(true)
@@ -309,7 +359,7 @@ export default function CreateConverterDialog({
       const response = await convertersApi.createConverter({
         name: registryName.trim(),
         type: selectedType,
-        params: parameterValues,
+        params,
       })
       reset()
       onCreated(response.converter_id)
@@ -434,7 +484,52 @@ export default function CreateConverterDialog({
                   <div className={styles.parameterGrid}>
                     {selectedConverterType?.parameters.map((parameter) => (
                       <div key={parameter.name} className={styles.parameterRow}>
-                        <ParameterInput
+                        {parameter.word_selection ? (
+                          <>
+                            <Field
+                              label={`${parameter.name}${parameter.required ? ' *' : ''}`}
+                              hint={parameter.description ?? undefined}
+                              validationMessage={
+                                showValidation && parameter.required && !wordSelections[parameter.name]?.type
+                                  ? 'Required' : undefined
+                              }
+                            >
+                              <Select
+                                value={wordSelections[parameter.name]?.type ?? ''}
+                                disabled={submitting}
+                                onChange={(_, data) => setWordSelections((current) => ({
+                                  ...current,
+                                  [parameter.name]: {
+                                    type: data.value,
+                                    values: getInitialFormValues(parameter.word_selection?.[data.value] ?? []),
+                                  },
+                                }))}
+                              >
+                                <option value="">Use converter default</option>
+                                {Object.keys(parameter.word_selection).map((type) => (
+                                  <option key={type} value={type}>{type}</option>
+                                ))}
+                              </Select>
+                            </Field>
+                            {(parameter.word_selection[wordSelections[parameter.name]?.type] ?? []).map((nested) => (
+                              <ParameterField
+                                key={nested.name}
+                                parameter={nested}
+                                allowEmptyList
+                                value={wordSelections[parameter.name]?.values[nested.name] ?? ''}
+                                disabled={submitting || !isEditableParameter(nested)}
+                                testIdPrefix={`word-selection-${parameter.name}`}
+                                onChange={(name, value) => setWordSelections((current) => ({
+                                  ...current,
+                                  [parameter.name]: {
+                                    ...current[parameter.name],
+                                    values: { ...current[parameter.name].values, [name]: value },
+                                  },
+                                }))}
+                              />
+                            ))}
+                          </>
+                        ) : <ParameterInput
                           parameter={parameter}
                           referenceOptions={referenceOptions(parameter)}
                           value={parameterValues[parameter.name] ?? ''}
@@ -449,7 +544,7 @@ export default function CreateConverterDialog({
                             [parameter.name]: value,
                           }))}
                           onBrowse={() => browse(parameter.name)}
-                        />
+                        />}
                       </div>
                     ))}
                   </div>

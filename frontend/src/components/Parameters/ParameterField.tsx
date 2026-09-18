@@ -15,6 +15,8 @@ export interface ParameterFieldProps {
   value: ParameterFormValue
   disabled: boolean
   onChange: (name: string, value: ParameterFormValue) => void
+  /** Let a list field distinguish an explicit empty list from an omitted value. */
+  allowEmptyList?: boolean
   /** Prefix for `data-testid` attributes. Defaults to `'param'` (e.g. `param-<name>`). */
   testIdPrefix?: string
 }
@@ -34,6 +36,7 @@ export default function ParameterField({
   value,
   disabled,
   onChange,
+  allowEmptyList = false,
   testIdPrefix = 'param',
 }: ParameterFieldProps) {
   const styles = useParameterFieldStyles()
@@ -96,6 +99,7 @@ export default function ParameterField({
   }
 
   const stringValue = typeof value === 'string' ? value : ''
+  const emptyListSelected = allowEmptyList && kind === 'list' && Array.isArray(value) && value.length === 0
 
   if (kind === 'select') {
     return (
@@ -123,16 +127,26 @@ export default function ParameterField({
     parameter.description ?? (kind === 'list' ? 'Comma-separated list of values.' : parameter.type_name)
 
   return (
-    <Field label={label} hint={hint}>
-      <Input
-        className={styles.control}
-        value={stringValue}
-        type={kind === 'number' ? 'number' : 'text'}
-        placeholder={placeholder}
-        disabled={disabled}
-        onChange={(_, data) => onChange(parameter.name, data.value)}
-        data-testid={testId}
-      />
-    </Field>
+    <>
+      <Field label={label} hint={hint}>
+        <Input
+          className={styles.control}
+          value={stringValue}
+          type={kind === 'number' ? 'number' : 'text'}
+          placeholder={placeholder}
+          disabled={disabled || emptyListSelected}
+          onChange={(_, data) => onChange(parameter.name, data.value)}
+          data-testid={testId}
+        />
+      </Field>
+      {kind === 'list' && allowEmptyList && (
+        <Checkbox
+          label={`Use empty list for ${parameter.name}`}
+          checked={emptyListSelected}
+          disabled={disabled}
+          onChange={(_, data) => onChange(parameter.name, data.checked ? [] : '')}
+        />
+      )}
+    </>
   )
 }

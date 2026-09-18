@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING
 
 # Deprecation support: remove in 1.4.0.
 from pyrit.common.deprecation import print_deprecation_message
+from pyrit.converter.text_selection_strategy import WordSelectionStrategy  # noqa: TC001 - registry annotation resolution
 from pyrit.converter.word_level_converter import WordLevelConverter
 
 if TYPE_CHECKING:
-    from pyrit.converter.text_selection_strategy import WordSelectionStrategy
     from pyrit.models import ComponentIdentifier
 
 
@@ -61,6 +61,7 @@ class BinaryConverter(WordLevelConverter):
         return self._create_identifier(
             params={
                 "word_selection_strategy": self._word_selection_strategy.__class__.__name__,
+                "word_selection_strategy_params": self._word_selection_strategy.get_identifier_params(),
                 "word_split_separator": self._word_split_separator,
                 "bits_per_char": self.bits_per_char.value,
             }

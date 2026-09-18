@@ -104,6 +104,10 @@ class Parameter(BaseModel):
         exclude=True,
         description="Set when the parameter references another registry component (resolved by name); not serialized.",
     )
+    word_selection: dict[str, list[Parameter]] | None = Field(
+        default=None,
+        description="Built-in word-selection types and their constructor parameters, supplied by the registry.",
+    )
     destination: ParameterDestination = Field(
         default=ParameterDestination.CONSTRUCTOR,
         exclude=True,
@@ -162,7 +166,7 @@ class Parameter(BaseModel):
     def _display_type(self) -> Any:
         """Wire type, where registry references are supplied as names."""
         if self.reference is None:
-            return self.param_type
+            return _unwrap_optional(self.param_type)
         annotation = _unwrap_optional(self.reference.annotation)
         return list[str] if get_origin(annotation) is list else str
 
@@ -313,7 +317,7 @@ class Parameter(BaseModel):
         """
         if self.reference is not None or self.opaque:
             return
-        param_type = self.param_type
+        param_type = _unwrap_optional(self.param_type)
         if param_type is None or _is_scalar_param_type(param_type):
             return
         if get_origin(param_type) is list:
@@ -445,7 +449,12 @@ def _coerce_enum(*, param_name: str, enum_type: type[Enum], raw_value: Any) -> A
         ValueError: If ``raw_value`` does not match any enum member by identity, value, or name.
     """
     for member in enum_type:
-        if raw_value is member or str(raw_value) == str(member.value) or str(raw_value) == member.name:
+        if (
+            raw_value is member
+            or str(raw_value) == str(member.value)
+            or str(raw_value) == member.name
+            or (isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool) and raw_value == member.value)
+        ):
             return member
     raise ValueError(
         f"Parameter '{param_name}' expected one of {[member.name for member in enum_type]}, got {raw_value!r}."

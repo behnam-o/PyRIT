@@ -79,6 +79,36 @@ The backend owns file-upload handling and cleanup, not the registry. See the
 [registry API migration notes](../../gui/0_gui.md#registry-api-migration-notes)
 for the REST contract and temporary compatibility behavior.
 
+## Enum and word-selection inputs
+
+The registry resolves constructor annotations in the defining class and module.
+Enum inputs accept member names, values, or existing Python enum objects.
+Nullable enum annotations also accept `None`; non-nullable enums reject it.
+For example, `BinaryConverter` accepts `"BITS_16"`, `"16"`, or `16` for
+`bits_per_char`. Its metadata lists `"8"`, `"16"`, and `"32"`, with default `"16"`.
+
+Word-selection inputs accept an existing Python `WordSelectionStrategy` or a
+JSON object:
+
+```json
+{"type": "random", "parameters": {"proportion": 0.3, "seed": 42}}
+```
+
+Use this object as `word_selection_strategy` on `BinaryConverter`, or as
+`selection_strategy` on `SATAMaskingConverter`. Built-in types are `all`,
+`random`, `position`, `indices`, `keywords`, `regex`, and `content`.
+The parameter's `word_selection` metadata maps each type to its typed fields.
+Supply JSON numbers, booleans, strings, and arrays as declared. Unknown fields,
+missing required fields, and invalid values are rejected. JSON cannot import
+custom strategy classes.
+
+Omit the selection parameter, or pass `null` when allowed, to keep the converter's
+default: all words for word-level converters and content words for SATA.
+In the GUI, select **Use empty list** to send `[]` for a word-selection list.
+An empty text field omits the list instead. For example, an empty `stopwords`
+list disables stopword filtering; an omitted list uses the built-in stopwords.
+The registry constructs the strategy; the strategy controls word selection.
+
 ## See Also
 
 - [Class Registries](1_class_registry.ipynb) - ScenarioRegistry, InitializerRegistry

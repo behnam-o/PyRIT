@@ -538,7 +538,12 @@ class WordIndexSelectionStrategy(WordSelectionStrategy):
 
         Args:
             indices (list[int]): The list of word indices to select.
+
+        Raises:
+            ValueError: If an index is negative.
         """
+        if any(index < 0 for index in indices):
+            raise ValueError("indices must be non-negative")
         self._indices = indices
 
     def get_identifier_params(self) -> dict[str, Any]:

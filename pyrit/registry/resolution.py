@@ -15,7 +15,7 @@ responsibilities:
   the identifier promotes as a reference to another registry (an included field
   typed as a child identifier, e.g. ``TargetIdentifier``) becomes a registry
   **reference**; every other parameter becomes a plain value parameter whose
-  ``param_type`` is the annotation with ``Optional[X]`` reduced to ``X``.
+  ``param_type`` preserves the annotation, including nullability.
 - **Resolve from a constructor** (``resolve_constructor_args``): derive the
   contract for a class and turn a flat dict of raw arguments into
   constructor-ready keyword arguments — coercing simple string values via
@@ -38,9 +38,11 @@ from __future__ import annotations
 
 import copy
 import inspect
+import logging
 import re
 import types
-from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, Union, get_args, get_origin
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, Union, get_args, get_origin, get_type_hints
 
 from pyrit.common.apply_defaults import REQUIRED_VALUE, _RequiredValueSentinel
 from pyrit.common.brick_contract import init_parameters_are_forwarded
@@ -64,6 +66,7 @@ _SKIPPED_PARAM_NAMES: frozenset[str] = frozenset({"self", "args", "kwargs"})
 #: ``inspect.Parameter.empty`` for an unannotated parameter. Aliased to ``Any``
 #: because no single static type captures all of these; the name documents intent.
 TypeAnnotation: TypeAlias = Any
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +152,21 @@ def _constructor_sources(cls: type) -> list[tuple[type, inspect.Signature]]:
             signature = inspect.signature(init)
         except (ValueError, TypeError) as exc:
             raise ValueError(f"Failed to inspect __init__ signature for '{cls.__name__}': {exc}") from exc
-        sources.append((owner, signature))
+        constructor = inspect.unwrap(init)
+        namespace = {**vars(owner), owner.__name__: owner}
+        parameters = []
+        for param in signature.parameters.values():
+            try:
+                annotation = get_type_hints(
+                    types.SimpleNamespace(__annotations__={param.name: param.annotation}),
+                    globalns=getattr(constructor, "__globals__", {}),
+                    localns=namespace,
+                )[param.name]
+            except (NameError, TypeError, AttributeError, SyntaxError) as exc:
+                logger.debug("Unresolved annotation for %s.%s: %s", owner.__name__, param.name, exc)
+                annotation = param.annotation
+            parameters.append(param.replace(annotation=annotation))
+        sources.append((owner, signature.replace(parameters=parameters)))
 
         if not init_parameters_are_forwarded(init) or index + 1 == len(owners):
             break
@@ -175,6 +192,8 @@ def _parameters_from_signature(
         list[Parameter]: Parameters declared by the constructor.
     """
     descriptions = _parse_arg_descriptions(owner)
+    from pyrit.registry.word_selection import word_selection_parameters
+
     parameters: list[Parameter] = []
     for name, param in signature.parameters.items():
         if name in _SKIPPED_PARAM_NAMES or param.kind in (
@@ -195,13 +214,14 @@ def _parameters_from_signature(
             )
             continue
 
-        param_type = None if param.annotation is inspect.Parameter.empty else _unwrap_optional(param.annotation)
+        param_type = None if param.annotation is inspect.Parameter.empty else param.annotation
         parameters.append(
             Parameter(
                 name=name,
                 description=descriptions.get(name, ""),
                 default=_default_for(param),
                 param_type=param_type,
+                word_selection=word_selection_parameters(_unwrap_optional(param_type)),
             )
         )
     return parameters
@@ -213,7 +233,7 @@ def derive_parameters(*, cls: type, identifier_type: type[ComponentIdentifier] |
 
     Maps each settable constructor parameter to a ``Parameter``: parameters the
     identifier promotes as references carry a ``RegistryReference``; plain
-    parameters carry an ``Optional``-unwrapped ``param_type``. When a constructor
+    parameters carry the full constructor annotation as ``param_type``. When a constructor
     explicitly declares that its ``**kwargs`` are forwarded, the next constructor
     in MRO order is merged. Child declarations take precedence over same-named
     base declarations.
@@ -467,6 +487,7 @@ def resolve_constructor_args(
                 f"Unknown parameter '{name}' for '{cls.__name__}'. Valid parameters: {sorted(by_name.keys())}"
             )
 
+        value_type = _unwrap_optional(param.param_type)
         if param.reference is not None:
             getter = _registry_getter_for_component_type(param.reference.component_type)
             if getter is None:
@@ -481,7 +502,13 @@ def resolve_constructor_args(
                 name=name,
                 annotation=param.reference.annotation,
             )
-        elif isinstance(value, str) and param.is_string_coercible:
+        elif param.word_selection is not None:
+            from pyrit.registry.word_selection import resolve_word_selection
+
+            resolved[name] = resolve_word_selection(parameter=param, value=value)
+        elif (isinstance(value, str) and param.is_string_coercible) or (
+            isinstance(value_type, type) and issubclass(value_type, Enum)
+        ):
             try:
                 resolved[name] = param.coerce_value(value)
             except (ValueError, TypeError) as e:

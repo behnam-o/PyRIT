@@ -16,7 +16,7 @@ export type ParameterControlKind = 'boolean' | 'select' | 'multiselect' | 'list'
  * A boolean parameter's value is one of `''` (unset — distinct from a
  * chosen `false`), `'true'`, or `'false'`. Everything else is a raw string
  * (scalar / unconstrained list, comma-joined) or a string array
- * (multiselect selections).
+ * (multiselect selections, or an explicit list including an empty list).
  */
 export type ParameterFormValue = string | string[]
 
@@ -204,8 +204,8 @@ export function buildParametersFromForm(
     const raw = typeof value === 'string' ? value.trim() : ''
 
     if (kind === 'list') {
-      const entries = parseListValue(raw)
-      if (entries.length === 0) {
+      const entries = Array.isArray(value) ? value : parseListValue(raw)
+      if (entries.length === 0 && !Array.isArray(value)) {
         if (param.required) {
           return { ok: false, error: `${param.name} is required.` }
         }

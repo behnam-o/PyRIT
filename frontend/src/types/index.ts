@@ -264,6 +264,8 @@ export interface Parameter {
   default?: string | string[] | null
   choices?: string[] | null
   is_list?: boolean
+  /** Strategy type names mapped to their constructor parameters; omission uses the converter default. */
+  word_selection?: Record<string, Parameter[]> | null
   reference_type?: 'target' | 'converter' | 'scorer' | 'scenario' | null
   description?: string | null
 }
