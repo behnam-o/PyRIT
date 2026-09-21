@@ -14,6 +14,7 @@ import HistoryPage from './components/History/HistoryPage'
 import type { HistoryTab } from './components/History/HistoryPage'
 import ScenarioHistory from './components/History/ScenarioHistory'
 import ScenarioCatalog from './components/Scenarios/ScenarioCatalog'
+import DatasetBrowser from '@/components/Datasets/DatasetBrowser'
 import ScenarioDetail from './components/Scenarios/ScenarioDetail'
 import ScenarioRunPage from './components/Scenarios/ScenarioRunPage'
 import FeedbackDialog from './components/Feedback/FeedbackDialog'
@@ -60,6 +61,7 @@ const VIEW_PATHS: Record<ViewName, string> = {
   history: HISTORY_ATTACKS_PATH,
   targets: '/targets',
   scenarios: '/scanner',
+  datasets: '/datasets',
   configuration: '/config',
 }
 
@@ -611,6 +613,7 @@ function App() {
                 }
               />
               <Route path="/scanner" element={<ScenarioCatalog />} />
+              <Route path="/datasets" element={<DatasetBrowser />} />
               <Route
                 path="/scanner/:scenarioName"
                 element={

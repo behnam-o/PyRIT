@@ -161,6 +161,7 @@ describe('ScenarioCatalog', () => {
 
     expect(await screen.findByText('scenario.pending')).toBeInTheDocument()
     expect(screen.getAllByText('Calculating...')).toHaveLength(2)
+    expect(screen.getByRole('link', { name: 'harmbench' })).toHaveAttribute('href', '/datasets?dataset=harmbench')
     expect(mockListCatalog).toHaveBeenNthCalledWith(1, 200, undefined, false)
 
     await act(async () => {
@@ -541,7 +542,47 @@ describe('ScenarioCatalog', () => {
 
     const row = await screen.findByTestId('scenario-card-scenario.compound')
     expect(within(row).getByText('6 objectives')).toBeInTheDocument()
-    expect(within(row).getByText('population-a · population-b')).toBeInTheDocument()
+    expect(within(row).getByRole('link', { name: 'population-a' })).toHaveAttribute(
+      'href', '/datasets?dataset=population-a',
+    )
+    expect(within(row).getByRole('link', { name: 'population-b' })).toHaveAttribute(
+      'href', '/datasets?dataset=population-b',
+    )
+  })
+
+  it('links catalog datasets when counts are unavailable and encodes their names', async () => {
+    mockListCatalog.mockResolvedValue({
+      items: [makeScenario({ default_datasets: ['local/example & 50%'] })],
+      pagination: { limit: 200, has_more: false },
+    })
+    render(<TestWrapper><ScenarioCatalog /></TestWrapper>)
+    expect(await screen.findByRole('link', { name: 'local/example & 50%' })).toHaveAttribute(
+      'href', '/datasets?dataset=local%2Fexample+%26+50%25',
+    )
+  })
+
+  it('links real dataset populations but not synthesized population labels', async () => {
+    mockListCatalog.mockResolvedValue({
+      items: [makeScenario({
+        default_datasets: [],
+        default_run_size: {
+          estimated_attack_count: 2, components: [], note: null,
+          datasets: [
+            { name: 'loaded-dataset', kind: 'dataset', logical_seed_group_count: 1,
+              selected_seed_group_count: 1, configured_caps: [], selection_note: null },
+            { name: 'generated-objectives', kind: 'synthesized', logical_seed_group_count: 1,
+              selected_seed_group_count: 1, configured_caps: [], selection_note: null },
+          ],
+        },
+      })],
+      pagination: { limit: 200, has_more: false },
+    })
+    render(<TestWrapper><ScenarioCatalog /></TestWrapper>)
+    expect(await screen.findByRole('link', { name: 'loaded-dataset' })).toHaveAttribute(
+      'href', '/datasets?dataset=loaded-dataset',
+    )
+    expect(screen.getByText('generated-objectives')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'generated-objectives' })).not.toBeInTheDocument()
   })
 
   it('shows an adaptive estimate as a plain attack range', async () => {

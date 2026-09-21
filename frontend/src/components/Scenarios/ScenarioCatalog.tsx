@@ -25,6 +25,7 @@ import {
 import { Link } from 'react-router'
 
 import MarkdownContent from '@/components/Markdown/MarkdownContent'
+import DatasetLinks from '@/components/Datasets/DatasetLinks'
 import { scenariosApi } from '@/services/api'
 import { toApiError } from '@/services/errors'
 import type { RegisteredScenario, ScenarioDatasetSummary } from '@/types'
@@ -92,7 +93,12 @@ function DefaultDatasetSummary({
   const styles = useScenarioCatalogStyles()
 
   if (calculating) {
-    return <Spinner size="tiny" label="Calculating..." labelPosition="after" />
+    return (
+      <div className={styles.compactStack}>
+        <Spinner size="tiny" label="Calculating..." labelPosition="after" />
+        <DatasetLinks names={declaredDatasets} emptyText="" />
+      </div>
+    )
   }
 
   if (datasets.length === 0 && declaredDatasets.length === 0) {
@@ -103,7 +109,7 @@ function DefaultDatasetSummary({
     return (
       <div className={styles.compactStack}>
         <Text weight="semibold">Population counts unavailable</Text>
-        <Text size={200} className={styles.secondaryText}>{declaredDatasets.join(' · ')}</Text>
+        <DatasetLinks names={declaredDatasets} />
       </div>
     )
   }
@@ -114,12 +120,20 @@ function DefaultDatasetSummary({
   )
   const datasetNames = declaredDatasets.length > 0
     ? declaredDatasets
-    : datasets.map((dataset) => dataset.name)
+    : datasets.filter((dataset: ScenarioDatasetSummary) => dataset.kind === 'dataset')
+      .map((dataset: ScenarioDatasetSummary) => dataset.name)
+  const synthesizedNames = declaredDatasets.length === 0
+    ? datasets.filter((dataset: ScenarioDatasetSummary) => dataset.kind !== 'dataset')
+      .map((dataset: ScenarioDatasetSummary) => dataset.name)
+    : []
 
   return (
     <div className={styles.compactStack}>
       <Text weight="semibold">{formatObjectiveCount(objectiveCount)}</Text>
-      <Text size={200} className={styles.secondaryText}>{datasetNames.join(' · ')}</Text>
+      <DatasetLinks names={datasetNames} emptyText="" />
+      {synthesizedNames.length > 0 && (
+        <Text size={200} className={styles.secondaryText}>{synthesizedNames.join(' · ')}</Text>
+      )}
     </div>
   )
 }

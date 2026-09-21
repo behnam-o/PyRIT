@@ -31,6 +31,7 @@ import {
 import { Link, useNavigate, useParams } from 'react-router'
 
 import MarkdownContent from '@/components/Markdown/MarkdownContent'
+import DatasetLinks from '@/components/Datasets/DatasetLinks'
 import ParameterField from '@/components/Parameters/ParameterField'
 import {
   buildParametersFromForm,
@@ -1078,6 +1079,9 @@ function ScenarioLaunchForm({
                     data-testid="dataset-override-input"
                   />
                 </Field>
+                <div className={styles.hint} aria-label="Selected datasets">
+                  <DatasetLinks names={effectiveDatasets} />
+                </div>
                 <Field
                   label="Max dataset size"
                   hint={configuredDefaultMaxDatasetSize
@@ -1258,9 +1262,7 @@ function ScenarioLaunchForm({
                       <dd>
                         <div className={styles.previewStack}>
                           <Text>
-                            {effectiveDatasets.length > 0
-                              ? effectiveDatasets.join(', ')
-                              : 'No datasets declared'}
+                            <DatasetLinks names={effectiveDatasets} />
                           </Text>
                           <Text size={200} className={styles.hint}>
                             {previewDatasets.length > 0 ? 'Custom override' : 'Scenario defaults'}

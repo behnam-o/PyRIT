@@ -1,6 +1,7 @@
 import {
   attackConversationRoutePath,
   attackRoutePath,
+  datasetRoutePath,
   routerPathParamValue,
   scenarioRunAttackRoutePath,
   scenarioRunProvenance,
@@ -8,6 +9,15 @@ import {
 } from './routeParams'
 
 const SCENARIO_RESULT_ID = '123e4567-e89b-12d3-a456-426614174000'
+
+describe('datasetRoutePath', () => {
+  it('preserves reserved characters and literal percent sequences in dataset names', () => {
+    const name = 'local/example & 50%+#'
+    const path = datasetRoutePath(name)
+    expect(path).toBe('/datasets?dataset=local%2Fexample+%26+50%25%2B%23')
+    expect(new URL(path, 'http://localhost').searchParams.get('dataset')).toBe(name)
+  })
+})
 
 describe('routerPathParamValue', () => {
   it('returns an empty value for a missing route parameter', () => {

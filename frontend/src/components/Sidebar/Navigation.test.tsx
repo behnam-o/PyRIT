@@ -138,6 +138,7 @@ describe("Navigation", () => {
       "Chat",
       "History",
       "Scanner",
+      "Datasets",
       "Targets",
       "Configuration",
     ]);
@@ -158,6 +159,18 @@ describe("Navigation", () => {
     expect(button).toHaveAttribute("aria-current", "page");
     await user.click(button);
     expect(onNavigate).toHaveBeenCalledWith("history");
+  });
+
+  it("marks Datasets current and navigates to the dataset browser", async () => {
+    const user = userEvent.setup();
+    const onNavigate = jest.fn();
+    renderWithProvider(
+      <Navigation {...defaultProps} currentView="datasets" onNavigate={onNavigate} />,
+    );
+    const button = screen.getByRole("button", { name: "Datasets" });
+    expect(button).toHaveAttribute("aria-current", "page");
+    await user.click(button);
+    expect(onNavigate).toHaveBeenCalledWith("datasets");
   });
 
   it("calls onNavigate with 'scenarios' when the scenarios button is clicked", async () => {

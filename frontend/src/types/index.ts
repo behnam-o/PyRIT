@@ -2,6 +2,35 @@
 // Frontend UI Types
 // ============================================================================
 
+export interface DatasetInfo {
+  name: string
+  is_loaded: boolean
+  can_load: boolean
+}
+
+export interface DatasetListResponse {
+  items: DatasetInfo[]
+}
+
+export interface DatasetSeed {
+  id: string
+  value: string
+  data_type: string
+  seed_type: string
+  name: string | null
+  role: string | null
+  language: string | null
+  group_id: string | null
+  sequence: number | null
+}
+
+export interface DatasetSeedsResponse {
+  items: DatasetSeed[]
+  total: number
+  offset: number
+  limit: number
+}
+
 export interface MessageAttachment {
   type: 'image' | 'audio' | 'video' | 'file'
   name: string

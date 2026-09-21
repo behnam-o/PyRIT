@@ -63,6 +63,33 @@ pyrit_backend --host 127.0.0.1 --port 8080
 
 **Production Mode**: When installed from PyPI, the backend serves the bundled frontend and will exit if frontend files are missing.
 
+## Dataset browser
+
+Open **Datasets** in the sidebar to search available dataset names. Select a dataset
+to browse its loaded seeds in pages of 25. A compact table shows seed/data type
+beside a single-line content preview. Expand a row for the complete seed as
+indented JSON, with type and content first, followed by its IDs and metadata.
+Copy either the original value or the full JSON record. The selected dataset is
+stored in the URL.
+
+The two panels fill the remaining viewport height and scroll independently.
+Headings and controls stay above the scrolling content; on very short screens,
+the panel itself can also scroll so controls never become inaccessible.
+On narrow screens the panels stack and share the available height.
+
+Each dataset has one status/action element: a download button when not loaded,
+a spinner while loading, and a check mark when its seeds are in memory.
+Use the download button beside a dataset or **Load dataset** in the selected
+panel to load it using its registered provider. Remote datasets
+may require network access and provider credentials. Both panels show loading
+state and errors, and update when loading finishes. Already-loaded datasets are
+not loaded again; memory-only datasets without providers cannot be loaded here.
+
+Browsing alone does not download anything. Seeds cannot be edited or deleted in
+this view. Non-text values are shown as stored references, not opened as media.
+Dataset names in the Scanner catalog, scan configuration/preview, and individual
+Scanner History run configuration link directly to the dataset browser.
+
 ## Stack
 
 - **React 18** - UI framework

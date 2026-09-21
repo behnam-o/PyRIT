@@ -695,6 +695,25 @@ describe('ScenarioDetail', () => {
     expect(request.max_retries).toBe(0)
   })
 
+  it('links default and override datasets in the scan form and run preview', async () => {
+    const user = userEvent.setup()
+    renderDetail('/scanner/foundry.red_team_agent')
+    await screen.findByTestId('scenario-target-select')
+    expect(screen.getByRole('link', { name: 'harmbench' })).toHaveAttribute('href', '/datasets?dataset=harmbench')
+
+    const name = 'local/example & 50%+#'
+    await user.type(screen.getByTestId('dataset-override-input'), name)
+    expect(screen.getByRole('link', { name })).toHaveAttribute(
+      'href', '/datasets?dataset=local%2Fexample+%26+50%25%2B%23',
+    )
+    expect(screen.queryByRole('link', { name: 'harmbench' })).not.toBeInTheDocument()
+    const preview = await openRunPreview(user)
+    expect(within(preview).getByRole('link', { name, hidden: true })).toHaveAttribute(
+      'href', '/datasets?dataset=local%2Fexample+%26+50%25%2B%23',
+    )
+    expect(mockStartRun).not.toHaveBeenCalled()
+  })
+
   it('shows the combined configured dataset size without submitting it as an override', async () => {
     const user = userEvent.setup()
     mockGetScenario.mockResolvedValueOnce(

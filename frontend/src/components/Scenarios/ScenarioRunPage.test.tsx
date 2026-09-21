@@ -342,7 +342,7 @@ describe('ScenarioRunPage', () => {
           identifier_hash: 'safe-hash',
         },
         techniques_used: ['Technique One'],
-        datasets_used: ['harmbench'],
+        datasets_used: ['harmbench', 'local/example & 50%'],
         scenario_parameters: { max_turns: 5 },
         labels: { operator: 'alice' },
         pyrit_version: '0.10.0',
@@ -354,7 +354,10 @@ describe('ScenarioRunPage', () => {
     expect(screen.getByText('gpt-4o')).toBeInTheDocument()
     expect(screen.getByText('https://example.test/v1')).toBeInTheDocument()
     expect(screen.queryByText('safe-hash')).not.toBeInTheDocument()
-    expect(screen.getByText('harmbench')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'harmbench' })).toHaveAttribute('href', '/datasets?dataset=harmbench')
+    expect(screen.getByRole('link', { name: 'local/example & 50%' })).toHaveAttribute(
+      'href', '/datasets?dataset=local%2Fexample+%26+50%25',
+    )
     expect(screen.getByText('max_turns: 5')).toBeInTheDocument()
     expect(screen.getByText('operator: alice')).toBeInTheDocument()
     expect(screen.getByText('0.10.0')).toBeInTheDocument()

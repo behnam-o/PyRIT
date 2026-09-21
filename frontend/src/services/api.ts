@@ -3,6 +3,9 @@ import { InteractionRequiredAuthError, type PublicClientApplication } from '@azu
 import { toApiError } from './errors'
 import { getGraphScopes } from '../auth/msalConfig'
 import type {
+  DatasetInfo,
+  DatasetListResponse,
+  DatasetSeedsResponse,
   TargetInstance,
   TargetListResponse,
   TargetCatalogResponse,
@@ -149,6 +152,25 @@ apiClient.interceptors.response.use(
 )
 
 export { apiClient }
+
+export const datasetsApi = {
+  listDatasets: async (): Promise<DatasetListResponse> => {
+    const response = await apiClient.get<DatasetListResponse>('/datasets')
+    return response.data
+  },
+
+  listSeeds: async (datasetName: string, limit: number, offset: number): Promise<DatasetSeedsResponse> => {
+    const response = await apiClient.get<DatasetSeedsResponse>('/datasets/seeds', {
+      params: { dataset_name: datasetName, limit, offset },
+    })
+    return response.data
+  },
+
+  loadDataset: async (datasetName: string): Promise<DatasetInfo> => {
+    const response = await apiClient.post<DatasetInfo>('/datasets/load', { dataset_name: datasetName })
+    return response.data
+  },
+}
 
 export const healthApi = {
   checkHealth: async () => {

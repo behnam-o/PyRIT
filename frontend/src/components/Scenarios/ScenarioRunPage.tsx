@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   Badge,
@@ -38,6 +38,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router'
 
 import AttackAttemptDetails from '@/components/AttackResults/AttackAttemptDetails'
 import ObjectiveScorerDetails from '@/components/AttackResults/ObjectiveScorerDetails'
+import DatasetLinks from '@/components/Datasets/DatasetLinks'
 import {
   formatDuration,
   formatTimestamp,
@@ -372,7 +373,7 @@ function ScenarioRunPageContent({ scenarioResultId, attackResultId }: ScenarioRu
             />
             <ConfigurationItem
               label="Datasets"
-              value={(run.datasets_used?.length ?? 0) > 0 ? run.datasets_used?.join(', ') ?? '' : 'Unavailable'}
+              value={<DatasetLinks names={run.datasets_used ?? []} emptyText="Unavailable" />}
             />
             <ConfigurationItem
               label="Scenario parameters"
@@ -718,7 +719,7 @@ function DisplayGroupMetric({ label, value }: MetricProps) {
 
 interface ConfigurationItemProps {
   readonly label: string
-  readonly value: string
+  readonly value: ReactNode
 }
 
 function ConfigurationItem({ label, value }: ConfigurationItemProps) {

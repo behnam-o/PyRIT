@@ -115,6 +115,7 @@ jest.mock("./components/Layout/MainLayout", () => {
         <button onClick={() => onNavigate("scenarios")} data-testid="nav-scenarios">
           Scenarios
         </button>
+        <button onClick={() => onNavigate("datasets")}>Datasets</button>
         {children}
       </div>
     );
@@ -347,6 +348,11 @@ jest.mock("./components/Scenarios/ScenarioCatalog", () => {
   };
 });
 
+jest.mock("@/components/Datasets/DatasetBrowser", () => ({
+  __esModule: true,
+  default: () => <div data-testid="dataset-browser" />,
+}));
+
 jest.mock("./components/Scenarios/ScenarioDetail", () => {
   const MockScenarioDetail = ({
     activeTarget,
@@ -428,6 +434,20 @@ describe("App", () => {
     renderApp();
     expect(screen.getByTestId("main-layout")).toBeInTheDocument();
     expect(screen.getByTestId("home-view")).toBeInTheDocument();
+  });
+
+  it("opens the dataset browser from a deep link", async () => {
+    renderApp("/datasets?dataset=local%2Fexample");
+    expect(await screen.findByTestId("dataset-browser")).toBeInTheDocument();
+    expect(screen.getByTestId("main-layout")).toHaveAttribute("data-current-view", "datasets");
+  });
+
+  it("navigates to the dataset browser", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByRole("button", { name: "Datasets" }));
+    expect(screen.getByTestId("dataset-browser")).toBeInTheDocument();
+    expect(screen.getByTestId("main-layout")).toHaveAttribute("data-current-view", "datasets");
   });
 
   it("starts in home view", () => {

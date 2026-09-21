@@ -2799,6 +2799,38 @@ class MemoryInterface(abc.ABC):
             logger.exception(f"Failed to retrieve prompts with dataset name {dataset_name} with error {e}")
             raise
 
+    def get_seed_entries_page(
+        self, *, dataset_name: str, limit: int, offset: int = 0
+    ) -> tuple[Sequence[SeedEntry], int]:
+        """
+        Retrieve stored seed rows and their count for an exact dataset name.
+
+        Pagination is applied in SQL, ordered by the unique seed ID. Rows are
+        returned without reconstructing seeds or resolving their stored values.
+
+        Args:
+            dataset_name (str): Non-empty dataset name to match exactly.
+            limit (int): Positive maximum number of rows to retrieve.
+            offset (int): Non-negative number of matching rows to skip.
+
+        Returns:
+            tuple[Sequence[SeedEntry], int]: The bounded page and the total matching count.
+
+        Raises:
+            ValueError: If the dataset name is empty or pagination bounds are invalid.
+        """
+        if not dataset_name.strip():
+            raise ValueError("dataset_name must not be empty")
+        if limit < 1 or offset < 0:
+            raise ValueError("limit must be positive and offset must be non-negative")
+
+        condition = SeedEntry.dataset_name == dataset_name
+        statement = select(SeedEntry).where(condition).order_by(SeedEntry.id.asc()).offset(offset).limit(limit)
+        with closing(self.get_session()) as session:
+            total = session.execute(select(func.count()).select_from(SeedEntry).where(condition)).scalar_one()
+            entries = session.execute(statement).scalars().all()
+        return entries, total
+
     def remove_seeds_from_memory(
         self,
         *,

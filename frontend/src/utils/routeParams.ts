@@ -1,3 +1,7 @@
+export function datasetRoutePath(datasetName: string): string {
+  return `/datasets?${new URLSearchParams({ dataset: datasetName }).toString()}`
+}
+
 const SCENARIO_RESULT_ID_QUERY_KEY = 'scenarioResultId'
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 

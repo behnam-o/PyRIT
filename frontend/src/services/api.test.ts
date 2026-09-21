@@ -23,6 +23,7 @@ import {
   attacksApi,
   labelsApi,
   scenariosApi,
+  datasetsApi,
 } from "./api";
 
 describe("api service", () => {
@@ -43,6 +44,32 @@ describe("api service", () => {
 
       await expect(authApi.getAccess()).resolves.toEqual(response.data);
       expect(apiClient.get).toHaveBeenCalledWith("/auth/access");
+    });
+
+  });
+
+  describe("datasetsApi", () => {
+    it("should list dataset names and loading state", async () => {
+      const data = { items: [{ name: "local/example", is_loaded: false, can_load: true }] };
+      (apiClient.get as jest.Mock).mockResolvedValueOnce({ data });
+      await expect(datasetsApi.listDatasets()).resolves.toEqual(data);
+      expect(apiClient.get).toHaveBeenCalledWith("/datasets");
+    });
+
+    it("should pass dataset names and pagination as query parameters", async () => {
+      const data = { items: [], total: 0, limit: 25, offset: 50 };
+      (apiClient.get as jest.Mock).mockResolvedValueOnce({ data });
+      await expect(datasetsApi.listSeeds("local/example & other", 25, 50)).resolves.toEqual(data);
+      expect(apiClient.get).toHaveBeenCalledWith("/datasets/seeds", {
+        params: { dataset_name: "local/example & other", limit: 25, offset: 50 },
+      });
+    });
+
+    it("should explicitly load one dataset by name", async () => {
+      const data = { name: "local/example & other", is_loaded: true, can_load: true };
+      (apiClient.post as jest.Mock).mockResolvedValueOnce({ data });
+      await expect(datasetsApi.loadDataset(data.name)).resolves.toEqual(data);
+      expect(apiClient.post).toHaveBeenCalledWith("/datasets/load", { dataset_name: data.name });
     });
   });
 
