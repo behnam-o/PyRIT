@@ -5,15 +5,17 @@
 
 import os
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from hashlib import sha256
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pyrit.common.authentication import (
     AUTH_MODE_ENVIRONMENT_VARIABLE,
     REQUIRED_ENTRA_ENVIRONMENT_VARIABLES,
 )
 
-AuthenticationMode = Literal["local", "entra"]
+AuthenticationMode = Literal["local", "entra", "workshop"]
 
 _ENTRA_VARIABLES = (*REQUIRED_ENTRA_ENVIRONMENT_VARIABLES, "ENTRA_ADMIN_GROUP_ID")
 _UNAUTHENTICATED_ADMIN_VARIABLE = "PYRIT_ALLOW_UNAUTHENTICATED_ADMIN"
@@ -33,6 +35,9 @@ class AuthenticationPolicy:
     allowed_group_ids: tuple[str, ...] = ()
     admin_group_id: str = ""
     allow_unauthenticated_admin: bool = False
+    workshop_username: str = ""
+    workshop_password_hash: bytes = field(default=b"", repr=False)
+    workshop_origin: str = ""
 
     @property
     def enabled(self) -> bool:
@@ -76,9 +81,9 @@ def resolve_authentication_policy(*, environment: Mapping[str, str] | None = Non
     """
     environment = os.environ if environment is None else environment
     mode_raw = environment.get(AUTH_MODE_ENVIRONMENT_VARIABLE, "").strip().casefold()
-    if mode_raw and mode_raw not in {"local", "entra"}:
+    if mode_raw and mode_raw not in {"local", "entra", "workshop"}:
         raise AuthenticationConfigurationError(
-            f"{AUTH_MODE_ENVIRONMENT_VARIABLE} must be 'local' or 'entra'; received {mode_raw!r}."
+            f"{AUTH_MODE_ENVIRONMENT_VARIABLE} must be 'local', 'entra', or 'workshop'; received {mode_raw!r}."
         )
 
     tenant_id = environment.get("ENTRA_TENANT_ID", "").strip()
@@ -89,6 +94,38 @@ def resolve_authentication_policy(*, environment: Mapping[str, str] | None = Non
         environment=environment,
         name=_UNAUTHENTICATED_ADMIN_VARIABLE,
     )
+
+    if mode_raw == "workshop":
+        if any(name in environment for name in _ENTRA_VARIABLES) or allow_unauthenticated_admin:
+            raise AuthenticationConfigurationError("Workshop authentication cannot enable Entra or anonymous admin.")
+        username = environment.get("PYRIT_WORKSHOP_USERNAME", "")
+        password = environment.get("PYRIT_WORKSHOP_PASSWORD", "")
+        origin = environment.get("PYRIT_WORKSHOP_ORIGIN", "")
+        if not username or not username.isascii() or not username.replace("-", "").isalnum():
+            raise AuthenticationConfigurationError(
+                "PYRIT_WORKSHOP_USERNAME must contain ASCII letters, digits or hyphens."
+            )
+        if not 16 <= len(password) <= 128 or not password.isascii() or any(c.isspace() for c in password):
+            raise AuthenticationConfigurationError(
+                "PYRIT_WORKSHOP_PASSWORD must contain 16-128 non-whitespace ASCII characters."
+            )
+        parsed = urlsplit(origin)
+        if (
+            parsed.scheme != "https"
+            or not parsed.netloc
+            or parsed.path
+            or parsed.query
+            or parsed.fragment
+            or parsed.username
+            or parsed.password
+        ):
+            raise AuthenticationConfigurationError("PYRIT_WORKSHOP_ORIGIN must be an HTTPS origin without a path.")
+        return AuthenticationPolicy(
+            mode="workshop",
+            workshop_username=username,
+            workshop_password_hash=sha256(password.encode()).digest(),
+            workshop_origin=origin,
+        )
 
     if mode_raw == "local":
         configured_entra_variables = [name for name in _ENTRA_VARIABLES if name in environment]

@@ -57,10 +57,11 @@ Examples:
 
     parser.add_argument(
         "--auth-mode",
-        choices=("local", "entra"),
+        choices=("local", "entra", "workshop"),
         help=(
             "Incoming-request authentication mode. 'local' deliberately disables Entra authentication "
             "for loopback-only development; 'entra' requires complete ENTRA_* settings. "
+            "'workshop' uses team HTTP Basic credentials over HTTPS. "
             "If omitted, startup requires complete Entra configuration."
         ),
     )
@@ -148,7 +149,7 @@ def main(*, args: list[str] | None = None) -> int:
                 "the launcher must enforce loopback-only publication or equivalent network isolation.",
                 file=sys.stderr,
             )
-        else:
+        elif os.getenv("PYRIT_AUTH_MODE", "").strip().casefold() != "workshop":
             print(
                 f"WARNING: Binding pyrit_backend to {parsed_args.host}:{parsed_args.port} exposes the API "
                 "on a non-loopback interface. Configure complete Entra authentication before sharing it.",

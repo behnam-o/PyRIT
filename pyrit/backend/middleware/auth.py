@@ -143,7 +143,7 @@ class EntraAuthMiddleware(BaseHTTPMiddleware):
         # Skip auth for public paths and static files
         path = get_route_path(request.scope)
         policy = get_authentication_policy(request)
-        if policy.mode == "local" or path in self._PUBLIC_PATHS or not path.startswith("/api"):
+        if policy.mode != "entra" or path in self._PUBLIC_PATHS or not path.startswith("/api"):
             return await call_next(request)
 
         try:

@@ -92,7 +92,7 @@ def test_resolve_authentication_policy_rejects_incomplete_entra_configuration(
 
 @pytest.mark.parametrize("mode", ["disabled", "optional", "true"])
 def test_resolve_authentication_policy_rejects_unknown_mode(mode: str) -> None:
-    with pytest.raises(AuthenticationConfigurationError, match="must be 'local' or 'entra'"):
+    with pytest.raises(AuthenticationConfigurationError, match="must be 'local', 'entra', or 'workshop'"):
         resolve_authentication_policy(environment={"PYRIT_AUTH_MODE": mode})
 
 

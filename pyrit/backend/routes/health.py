@@ -44,14 +44,16 @@ async def health_check_async(*, request: Request, response: Response) -> dict[st
     The frontend connection health monitor polls it every 60 seconds with a
     5-second timeout to detect backend availability. Adding authentication,
     database queries, or heavy computation here will break that contract.
-    HTTP 200 reports backend availability even when PyRIT initialization fails;
-    deployment checks use the readiness fields instead.
+    HTTP 200 normally reports backend availability even when PyRIT initialization
+    fails. Deployment probes can use ?ready=true to require runtime readiness.
 
     Returns:
         dict[str, str | bool | None]: Health status, timestamp, runtime readiness, and serving ACA revision.
     """
     readiness = _runtime_readiness(request)
     response.headers["Cache-Control"] = "no-store"
+    if request.query_params.get("ready") == "true" and not readiness["ready"]:
+        response.status_code = 503
     return {
         "status": "healthy",
         "timestamp": datetime.now(UTC).isoformat(),

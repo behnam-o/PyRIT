@@ -27,6 +27,7 @@ from pyrit.backend.middleware.auth import EntraAuthMiddleware
 from pyrit.backend.middleware.compatibility import CompatibilityAPI, CompatibilityMiddleware
 from pyrit.backend.middleware.request_size import RequestSizeLimitMiddleware
 from pyrit.backend.middleware.runtime import RuntimeAdmissionMiddleware
+from pyrit.backend.middleware.workshop_auth import WorkshopAuthMiddleware
 from pyrit.backend.routes import (
     analytics,
     attacks,
@@ -126,6 +127,7 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-Request-ID", _compatibility.COMPATIBILITY_HEADER],
 )
 app.add_middleware(RequestIdMiddleware)
+app.add_middleware(WorkshopAuthMiddleware)
 app.add_middleware(SecurityHeadersMiddleware, dev_mode=DEV_MODE)
 
 
