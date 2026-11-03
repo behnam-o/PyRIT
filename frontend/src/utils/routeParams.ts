@@ -36,7 +36,7 @@ export function attackRoutePath(
   scenarioResultId?: string | null,
 ): string {
   return appendScenarioRunProvenance(
-    `/attacks/${encodeURIComponent(attackResultId)}`,
+    `/attack/chat/${encodeURIComponent(attackResultId)}`,
     scenarioResultId,
   )
 }
@@ -49,7 +49,7 @@ export function attackConversationRoutePath(
   findingEvidenceId?: string | null,
 ): string {
   const path = appendScenarioRunProvenance(
-    `/attacks/${encodeURIComponent(attackResultId)}/conversations/${encodeURIComponent(conversationId)}`,
+    `/attack/chat/${encodeURIComponent(attackResultId)}/conversations/${encodeURIComponent(conversationId)}`,
     scenarioResultId,
   )
   if (!findingEvidenceId || !UUID_PATTERN.test(findingEvidenceId)) return path
@@ -58,12 +58,20 @@ export function attackConversationRoutePath(
 
 /** Builds the route for one scenario run. Callers must pass a trusted persisted ID. */
 export function scenarioRunRoutePath(scenarioResultId: string): string {
-  return `/scanner-history/${encodeURIComponent(scenarioResultId)}`
+  return `/scanner/history/${encodeURIComponent(scenarioResultId)}`
 }
 
 /** Builds the route for one attack result within a scenario run. */
 export function scenarioRunAttackRoutePath(scenarioResultId: string, attackResultId: string): string {
   return `${scenarioRunRoutePath(scenarioResultId)}/${encodeURIComponent(attackResultId)}`
+}
+
+export function scenarioConversationRoutePath(scenarioResultId: string, conversationId: string): string {
+  return `${scenarioRunRoutePath(scenarioResultId)}/conversations/${encodeURIComponent(conversationId)}`
+}
+
+export function scenarioRerunRoutePath(scenarioName: string, scenarioResultId: string): string {
+  return `/scanner/launch/${encodeURIComponent(scenarioName)}?rerun=${encodeURIComponent(scenarioResultId)}`
 }
 
 function appendScenarioRunProvenance(path: string, scenarioResultId?: string | null): string {
@@ -154,5 +162,5 @@ export function isDatasetsPath(pathOrUrl: string): boolean {
 export function isChatPath(pathOrUrl: string): boolean {
   if (!pathOrUrl) return false
   const cleanPath = pathOrUrl.split('?')[0].split('#')[0]
-  return cleanPath === '/chat' || cleanPath.startsWith('/attacks/')
+  return cleanPath === '/attack/chat' || cleanPath.startsWith('/attack/chat/')
 }

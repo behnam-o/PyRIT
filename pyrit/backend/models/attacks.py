@@ -24,9 +24,11 @@ from pyrit.backend.models.common import (
     TextStr,
 )
 from pyrit.models import (
+    AttackOutcome,
     AttackResult,
     ChatMessageRole,
     ConversationReference,
+    ConversationSummary,
     Message,
     MessagePiece,
     PromptDataType,
@@ -349,6 +351,13 @@ class ConversationMessagesResponse(BaseModel):
     conversation_id: str = Field(..., description="Conversation identifier")
     messages: list[MessageView] = Field(default_factory=list, description="All messages in order")
     scoring_failure: ScoringFailure | None = None
+    automated_score: ScoreView | None = None
+    outcome: AttackOutcome | None = Field(
+        default=None, description="Outcome for the latest response; a human score overrides the attack"
+    )
+    latest_response_id: str | None = Field(
+        default=None, description="First piece ID of the latest live assistant response"
+    )
     target_response_status: TargetResponseStatus | None = Field(
         default=None,
         description=(
@@ -356,6 +365,8 @@ class ConversationMessagesResponse(BaseModel):
             "None when the conversation does not end with a target response."
         ),
     )
+    pagination: PaginationInfo | None = None
+    partial_message_sequences: list[int] = Field(default_factory=list)
 
 
 # ============================================================================
@@ -578,15 +589,6 @@ class UpdateAttackRequest(BaseModel):
 # ============================================================================
 
 
-class ConversationSummary(BaseModel):
-    """Summary of a conversation (message count, preview, timestamp)."""
-
-    conversation_id: str = Field(..., description="Unique conversation identifier")
-    message_count: int = Field(0, description="Number of messages in this conversation")
-    last_message_preview: str | None = Field(None, description="Preview of the last message")
-    created_at: datetime | None = Field(None, description="Timestamp of the first message")
-
-
 class AttackConversationsResponse(BaseModel):
     """Response listing all conversations belonging to an attack."""
 
@@ -595,6 +597,8 @@ class AttackConversationsResponse(BaseModel):
     conversations: list[ConversationSummary] = Field(
         default_factory=list, description="All conversations including main"
     )
+    pagination: PaginationInfo | None = None
+    total_count: int | None = None
 
 
 class CreateConversationRequest(BaseModel):
