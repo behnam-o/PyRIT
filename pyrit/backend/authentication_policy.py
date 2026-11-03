@@ -38,6 +38,7 @@ class AuthenticationPolicy:
     workshop_username: str = ""
     workshop_password_hash: bytes = field(default=b"", repr=False)
     workshop_origin: str = ""
+    workshop_login_origin: str = ""
 
     @property
     def enabled(self) -> bool:
@@ -63,6 +64,20 @@ def _parse_boolean_setting(*, environment: Mapping[str, str], name: str) -> bool
 
 def _parse_allowed_group_ids(value: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(group_id.strip() for group_id in value.split(",") if group_id.strip()))
+
+
+def _validate_https_origin(*, value: str, name: str) -> None:
+    parsed = urlsplit(value)
+    if (
+        parsed.scheme != "https"
+        or not parsed.netloc
+        or parsed.path
+        or parsed.query
+        or parsed.fragment
+        or parsed.username
+        or parsed.password
+    ):
+        raise AuthenticationConfigurationError(f"{name} must be an HTTPS origin without a path.")
 
 
 def resolve_authentication_policy(*, environment: Mapping[str, str] | None = None) -> AuthenticationPolicy:
@@ -101,6 +116,7 @@ def resolve_authentication_policy(*, environment: Mapping[str, str] | None = Non
         username = environment.get("PYRIT_WORKSHOP_USERNAME", "")
         password = environment.get("PYRIT_WORKSHOP_PASSWORD", "")
         origin = environment.get("PYRIT_WORKSHOP_ORIGIN", "")
+        login_origin = environment.get("PYRIT_WORKSHOP_LOGIN_ORIGIN", "")
         if not username or not username.isascii() or not username.replace("-", "").isalnum():
             raise AuthenticationConfigurationError(
                 "PYRIT_WORKSHOP_USERNAME must contain ASCII letters, digits or hyphens."
@@ -109,22 +125,15 @@ def resolve_authentication_policy(*, environment: Mapping[str, str] | None = Non
             raise AuthenticationConfigurationError(
                 "PYRIT_WORKSHOP_PASSWORD must contain 16-128 non-whitespace ASCII characters."
             )
-        parsed = urlsplit(origin)
-        if (
-            parsed.scheme != "https"
-            or not parsed.netloc
-            or parsed.path
-            or parsed.query
-            or parsed.fragment
-            or parsed.username
-            or parsed.password
-        ):
-            raise AuthenticationConfigurationError("PYRIT_WORKSHOP_ORIGIN must be an HTTPS origin without a path.")
+        _validate_https_origin(value=origin, name="PYRIT_WORKSHOP_ORIGIN")
+        if login_origin:
+            _validate_https_origin(value=login_origin, name="PYRIT_WORKSHOP_LOGIN_ORIGIN")
         return AuthenticationPolicy(
             mode="workshop",
             workshop_username=username,
             workshop_password_hash=sha256(password.encode()).digest(),
             workshop_origin=origin,
+            workshop_login_origin=login_origin,
         )
 
     if mode_raw == "local":
