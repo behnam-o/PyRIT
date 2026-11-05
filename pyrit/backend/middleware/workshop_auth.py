@@ -14,7 +14,7 @@ from http.cookies import CookieError, SimpleCookie
 from secrets import token_bytes, token_urlsafe
 from time import monotonic, time
 from typing import ClassVar
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlencode
 
 from starlette.datastructures import Headers
 from starlette.requests import Request
@@ -85,15 +85,15 @@ class WorkshopAuthMiddleware:
             return JSONResponse({"detail": "Submit a form token."}, status_code=415)
         body = bytearray()
         async for chunk in Request(scope, receive=receive).stream():
-            if len(body) + len(chunk) > 2048:
+            if len(body) + len(chunk) > 65536:
                 return JSONResponse({"detail": "Login form is too large."}, status_code=413)
             body.extend(chunk)
         try:
-            fields = parse_qs(body.decode("ascii"), keep_blank_values=True, strict_parsing=True, max_num_fields=2)
+            fields = parse_qs(body.decode("ascii"), keep_blank_values=True, strict_parsing=True, max_num_fields=5)
         except (UnicodeDecodeError, ValueError):
             fields = {}
         tokens = fields.get("token", [])
-        token = tokens[0] if set(fields) == {"token"} and len(tokens) == 1 else ""
+        token = tokens[0] if "token" in fields and len(tokens) == 1 else ""
         if (
             not token.isascii()
             or not 16 <= len(token) <= 128
@@ -102,7 +102,17 @@ class WorkshopAuthMiddleware:
             self._failures.append(monotonic())
             logger.warning("Workshop login rejected invalid credentials.")
             return JSONResponse({"detail": "Invalid team token. Return to the CTF and sign in again."}, status_code=401)
-        response = RedirectResponse("/", status_code=303)
+        allowed = {"token", "objective", "target", "scorer"}
+        if set(fields) - allowed or any(len(values) != 1 for values in fields.values()):
+            return JSONResponse({"detail": "Invalid new attack fields."}, status_code=400)
+        prefill = {name: values[0] for name, values in fields.items() if name != "token"}
+        for name, value in prefill.items():
+            if len(value) > (10000 if name == "objective" else 128) or (
+                name != "objective" and not re.fullmatch(r"[A-Za-z0-9_.-]+", value)
+            ):
+                return JSONResponse({"detail": "Invalid new attack field."}, status_code=400)
+        destination = "/attack/chat?" + urlencode(prefill) if prefill else "/"
+        response = RedirectResponse(destination, status_code=303)
         response.set_cookie(
             self.COOKIE_NAME,
             self._session_cookie(policy),

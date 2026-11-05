@@ -25,11 +25,14 @@ Origin for mutations and WebSocket connections. HTTP Basic credentials are sent
 on every request: expose the deployment only through HTTPS and never log the
 Authorization header. No credentials should be embedded in the frontend image.
 
-The CTF submits a normal form POST to `/workshop/login` with a single `token`
-field. The endpoint accepts only the configured CTF Origin, bounds the form to
-2048 bytes, and rate-limits failed logins. It never takes credentials or redirect
+The CTF submits a normal form POST to `/workshop/login` with a `token` field and
+optional `objective`, `target`, and `scorer` fields. The endpoint accepts only the
+configured CTF Origin, bounds the form to 64 KiB, and rate-limits failed logins.
+Objectives are limited to 10,000 characters; registry names to 128 characters.
+It never takes credentials or arbitrary redirect
 destinations from a URL. Success sets a signed `__Host-pyrit-workshop` cookie
-(`Secure`, `HttpOnly`, `SameSite=Lax`, path `/`, no Domain) and redirects to `/`.
+(`Secure`, `HttpOnly`, `SameSite=Lax`, path `/`, no Domain) and redirects to `/`,
+or to `/attack/chat` with encoded prefill query parameters when supplied.
 Ordinary mutation and WebSocket origin checks remain restricted to CoPyRIT's own
 origin; the CTF origin is allowed only on this login endpoint.
 
@@ -48,3 +51,15 @@ backend to pick up changed credentials.
 This mode does not change model-provider authentication. A separate
 `WORKSHOP_TOKEN` can identify the team to a CTF server; reusing it as the login
 password deliberately gives its holder both permissions.
+
+## New-attack links
+
+The unsaved attack page `/attack/chat` accepts optional `objective`, `target`, and
+`scorer` query parameters. Target/scorer values are registered names. The page
+waits for registry loading, resolves names to current identities, and reports
+unknown or ineligible values explicitly. Prefill is applied once per navigation:
+subsequent user edits are retained, and existing attack URLs are not modified.
+No attack is created, prompt sent, or default preference changed just by opening
+a link. Omitting parameters preserves normal new-attack defaults. Objectives in
+URLs can appear in browser history, so never put credentials or sensitive material
+in these links.

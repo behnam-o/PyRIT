@@ -44,7 +44,7 @@ export function useAttackMutations({
   onAttackChange,
   onObjectiveChange,
 }: UseAttackMutationsOptions): AttackMutations {
-  const [pendingObjective, setPendingObjective] = useState('')
+  const [pendingObjective, setPendingObjective] = useState(attackResultId ? '' : objective)
   const currentObjective = attackResultId ? objective : pendingObjective
 
   const resetPendingObjective = useCallback((): void => { setPendingObjective('') }, [])

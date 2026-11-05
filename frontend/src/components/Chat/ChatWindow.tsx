@@ -380,6 +380,7 @@ interface ChatWindowProps {
   executionReadOnly?: boolean
   manualContinuation?: ManualContinuation | null
   defaultChatScorer?: RegisteredComponentReference | null
+  initialDraftScorer?: RegisteredComponentReference
   availableScorers?: ScorerInstance[]
   scorersLoading?: boolean
   scorersError?: string | null
@@ -430,6 +431,7 @@ export default function ChatWindow({
   executionReadOnly = false,
   manualContinuation,
   defaultChatScorer,
+  initialDraftScorer,
   availableScorers = [],
   scorersLoading = false,
   scorersError,
@@ -459,7 +461,7 @@ export default function ChatWindow({
   const [applyingConversationId, setApplyingConversationId] = useState<string | null>(null)
   const isApplyingScorer = applyingConversationId !== null
   const [applyStatus, setApplyStatus] = useState<ConversationApplyStatus | null>(null)
-  const [draftScorer, setDraftScorer] = useState<RegisteredComponentReference | null | undefined>(undefined)
+  const [draftScorer, setDraftScorer] = useState<RegisteredComponentReference | null | undefined>(initialDraftScorer)
   const selectedScorer = attackResultId ? chatScorer : draftScorer === undefined ? defaultChatScorer ?? null : draftScorer
   const scoringAttackRef = useRef(attackResultId)
   const scoringSelectionRef = useRef(JSON.stringify([attackResultId, objective, selectedScorer?.identifier_hash]))

@@ -39,6 +39,15 @@ function renderMutations(overrides: Partial<UseAttackMutationsOptions> = {}) {
 describe('useAttackMutations', () => {
   beforeEach(() => jest.resetAllMocks())
 
+  it('initializes a new objective once without overwriting user edits or saving an attack', async () => {
+    const { result, rerender, options } = renderMutations({ attackResultId: null, objective: 'Linked objective' })
+    expect(result.current.currentObjective).toBe('Linked objective')
+    await act(async () => { await result.current.changeObjective('Edited objective', 'Linked objective') })
+    rerender({ ...options, objective: 'Linked objective' })
+    expect(result.current.currentObjective).toBe('Edited objective')
+    expect(attacksApi.updateAttack).not.toHaveBeenCalled()
+  })
+
   describe('updateHumanScore', () => {
     it('should send the exact manual score and reload the viewed conversation', async () => {
       jest.mocked(scoresApi.createManualScore).mockResolvedValue(score)

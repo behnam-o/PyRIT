@@ -189,7 +189,7 @@ def test_handoff_rejects_wrong_method_content_type_and_oversized_body(client: Te
     assert (
         client.post(
             "/workshop/login",
-            content=b"x" * 2049,
+            content=b"x" * 65537,
             headers={**headers, "Content-Type": "application/x-www-form-urlencoded"},
         ).status_code
         == 413
@@ -231,6 +231,48 @@ def test_session_rejects_tampering_expiry_and_password_rotation(client: TestClie
         environment={**SETTINGS, "PYRIT_WORKSHOP_PASSWORD": "rotated-test-token-not-real"}
     )
     assert client.get("/", headers=headers).status_code == 401
+
+
+def test_handoff_preserves_only_safe_new_attack_fields(client: TestClient) -> None:
+    from urllib.parse import parse_qs, urlsplit
+
+    fields = {
+        "token": SETTINGS["PYRIT_WORKSHOP_PASSWORD"],
+        "objective": "Summarize & test?\nUnicode: caf\u00e9",
+        "target": "ctf_llm_01",
+        "scorer": "ctf_llm_feedback",
+    }
+    response = client.post(
+        "/workshop/login",
+        data=fields,
+        headers={"Origin": SETTINGS["PYRIT_WORKSHOP_LOGIN_ORIGIN"]},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    location = urlsplit(response.headers["location"])
+    assert location.path == "/attack/chat" and not location.netloc and not location.scheme
+    assert parse_qs(location.query) == {name: [value] for name, value in fields.items() if name != "token"}
+    assert fields["token"] not in response.headers["location"]
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"redirect": "https://evil.example"},
+        {"target": "https://evil.example"},
+        {"objective": "x" * 10001},
+        {"scorer": "x" * 129},
+    ],
+)
+def test_handoff_rejects_redirects_and_invalid_prefill(client: TestClient, extra: dict[str, str]) -> None:
+    response = client.post(
+        "/workshop/login",
+        data={"token": SETTINGS["PYRIT_WORKSHOP_PASSWORD"], **extra},
+        headers={"Origin": SETTINGS["PYRIT_WORKSHOP_LOGIN_ORIGIN"]},
+        follow_redirects=False,
+    )
+    assert response.status_code == 400
+    assert "set-cookie" not in response.headers
 
 
 def test_session_cookie_is_not_valid_in_another_middleware_instance(client: TestClient) -> None:

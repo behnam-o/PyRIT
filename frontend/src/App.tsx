@@ -72,6 +72,7 @@ import { attacksApi, authApi, versionApi } from './services/api'
 import { toApiError } from './services/errors'
 import { generateClientId } from './utils/clientId'
 import { resolveChatScorerReference } from '@/utils/scorerPresentation'
+import { parseNewAttackLink, resolveNewAttackLink } from '@/utils/newAttackLink'
 import { getOperationWarning } from '@/utils/operationWarnings'
 import { useTour } from './hooks/useTour'
 import { ChatDraftProvider, useChatDraftHandoff } from './hooks/useChatDraftHandoff'
@@ -231,6 +232,9 @@ function AppContent({ operatorAlias }: { operatorAlias: string | null }) {
     pathname: string
     key: number
     target: TargetReference | null
+    prefillKey?: string
+    objective?: string
+    scorer?: RegisteredComponentReference
   }>({ pathname: location.pathname, key: 0, target: targetDefaults.objectiveReference })
   if (draftSession.pathname !== location.pathname) {
     const isReturningToUnsavedChatWithPreservedDraft =
@@ -259,6 +263,31 @@ function AppContent({ operatorAlias }: { operatorAlias: string | null }) {
   )
   const attackMatch = matchPath({ path: '/attack/chat/:attackId', end: true }, location.pathname)
   const routeAttackId = conversationMatch?.params.attackId ?? attackMatch?.params.attackId ?? null
+  const linkPrefill = useMemo(() => {
+    if (location.pathname !== VIEW_PATHS.chat) return null
+    try {
+      const fields = parseNewAttackLink(location.search)
+      if (!fields) return null
+      if (registry.error || scorerRegistry.error) return { error: registry.error ?? scorerRegistry.error }
+      if (registry.loading || scorerRegistry.loading || !ready) return { loading: true }
+      return { values: resolveNewAttackLink(fields, registry.targets, scorerRegistry.scorers) }
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'The new attack link could not be loaded.' }
+    }
+  }, [location.pathname, location.search, registry.error, registry.loading, registry.targets,
+    scorerRegistry.error, scorerRegistry.loading, scorerRegistry.scorers, ready])
+  useLayoutEffect(() => {
+    if (!linkPrefill?.values || draftSession.prefillKey === location.key) return
+    clearPreservedDraft()
+    dismissPendingImport()
+    setDraftSession((current) => ({
+      pathname: location.pathname, key: current.key + 1, prefillKey: location.key,
+      target: linkPrefill.values.target ?? targetDefaults.objectiveReference,
+      objective: linkPrefill.values.objective,
+      scorer: linkPrefill.values.scorer,
+    }))
+  }, [linkPrefill, draftSession.prefillKey, location.key, location.pathname, targetDefaults.objectiveReference,
+    clearPreservedDraft, dismissPendingImport])
   const routeConversationId = conversationMatch?.params.conversationId ?? null
   const currentView: ViewName = routeAttackId !== null ? 'chat' : viewFromPath(location.pathname)
   const [canManageConfiguration, setCanManageConfiguration] = useState(false)
@@ -648,6 +677,9 @@ function AppContent({ operatorAlias }: { operatorAlias: string | null }) {
       ...current,
       key: current.key + 1,
       target: targetDefaults.objectiveReference,
+      prefillKey: undefined,
+      objective: undefined,
+      scorer: undefined,
     }))
   }, [location, clearPreservedDraft, dismissPendingImport, targetDefaults.objectiveReference])
 
@@ -752,7 +784,11 @@ function AppContent({ operatorAlias }: { operatorAlias: string | null }) {
     })
   }, [location.search, navigate])
 
-  const chatElement = isAttackNotFound || isAttackError || isEvidenceConversationMissing ? (
+  const chatElement = linkPrefill?.error ? (
+    <MessageBar intent="error"><MessageBarBody>{linkPrefill.error}</MessageBarBody></MessageBar>
+  ) : linkPrefill && (linkPrefill.loading || draftSession.prefillKey !== location.key) ? (
+    <Spinner label="Loading the linked attack configuration..." />
+  ) : isAttackNotFound || isAttackError || isEvidenceConversationMissing ? (
     <AttackNotFound
       attackId={routeAttackId ?? ''}
       variant={isAttackError ? 'error' : 'not-found'}
@@ -801,7 +837,8 @@ function AppContent({ operatorAlias }: { operatorAlias: string | null }) {
       onRetryTargetResolution={retryTargetResolution}
       isLoadingAttack={isLoadingAttack}
       relatedConversationCount={readyAttack ? readyAttack.relatedConversationIds.length : 0}
-      objective={readyAttack ? readyAttack.objective : ''}
+      objective={readyAttack ? readyAttack.objective : draftSession.objective ?? ''}
+      initialDraftScorer={routeAttackId === null ? draftSession.scorer : undefined}
       outcome={readyAttack?.outcome}
       automatedScore={readyAttack?.automatedScore}
       humanScore={readyAttack?.humanScore}

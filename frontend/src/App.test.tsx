@@ -16,11 +16,12 @@ import { DEFAULT_ANALYTICS_VIEW, analyticsViewToHash } from "./utils/attackAnaly
 
 const mockGetActiveAccount = jest.fn();
 let mockCreatedAttackRender: Promise<void> | null = null;
+let mockInitialTargets: import("./types").TargetInstance[] = [];
 
 jest.mock("./hooks/useTargetRegistry", () => ({
   useTargetRegistry: () => {
     const { useState } = jest.requireActual<typeof import("react")>("react");
-    const [targets, setTargets] = useState<import("./types").TargetInstance[]>([]);
+    const [targets, setTargets] = useState<import("./types").TargetInstance[]>(mockInitialTargets);
     return {
       targets,
       loading: false,
@@ -85,6 +86,12 @@ jest.mock("./services/api", () => ({
   targetsApi: {
     listTargets: jest.fn(),
     getTarget: jest.fn(),
+  },
+  scorersApi: {
+    listScorers: jest.fn().mockResolvedValue({ items: [{
+      scorer_registry_name: 'ctf_llm_feedback',
+      identifier: { class_name: 'WorkshopLLMScorer', class_module: 'workshop', hash: 'feedback-hash', scorer_type: 'true_false' },
+    }], pagination: { has_more: false, next_cursor: null } }),
   },
   convertersApi: {
     listConverters: jest.fn().mockResolvedValue({ items: [] }),
@@ -197,6 +204,7 @@ jest.mock("./components/Chat/ChatWindow", () => {
     activeConversationId,
     attackTarget,
     objective,
+    initialDraftScorer,
     outcome,
     targetResolutionStatus,
     onRetryTargetResolution,
@@ -214,6 +222,7 @@ jest.mock("./components/Chat/ChatWindow", () => {
     activeConversationId: string | null;
     attackTarget?: { identifier_hash?: string | null } | null;
     objective?: string;
+    initialDraftScorer?: import("./types").RegisteredComponentReference;
     outcome?: string;
     targetResolutionStatus?: string;
     onRetryTargetResolution?: () => void;
@@ -303,6 +312,7 @@ jest.mock("./components/Chat/ChatWindow", () => {
         </span>
         <span data-testid="attack-target-hash">{attackTarget?.identifier_hash ?? "none"}</span>
         <span data-testid="objective">{objective ?? ""}</span>
+        <span data-testid="prefilled-scorer">{initialDraftScorer?.registry_name ?? "none"}</span>
         <span data-testid="outcome">{outcome ?? "none"}</span>
         <span data-testid="target-resolution-status">{targetResolutionStatus ?? "none"}</span>
         <span data-testid="labels-operator">{labels.operator ?? ""}</span>
@@ -689,6 +699,7 @@ describe("App", () => {
   }
 
   beforeEach(() => {
+    mockInitialTargets = [];
     jest.clearAllMocks();
     mockCreatedAttackRender = null;
     mockGetActiveAccount.mockReturnValue(null);
@@ -1326,6 +1337,22 @@ describe("App", () => {
     );
     await waitFor(() => expect(mockGetAttack).toHaveBeenCalledWith("ar-home-attack"));
     await waitFor(() => expect(screen.getByTestId("conversation-id")).toHaveTextContent("home-conv-1"));
+  });
+
+  it("opens a linked unsaved attack with objective, target, and scorer", async () => {
+    mockInitialTargets = [makeTarget({ target_registry_name: 'ctf_llm_01', identifier_hash: 'target-hash' })];
+    renderApp("/attack/chat?objective=Linked%20objective&target=ctf_llm_01&scorer=ctf_llm_feedback");
+    expect(await screen.findByTestId("objective")).toHaveTextContent("Linked objective");
+    expect(screen.getByTestId("active-target-name")).toHaveTextContent("ctf_llm_01");
+    expect(screen.getByTestId("prefilled-scorer")).toHaveTextContent("ctf_llm_feedback");
+    expect(screen.getByTestId("attack-result-id")).toHaveTextContent("none");
+    expect(attacksApi.createAttack).not.toHaveBeenCalled();
+  });
+
+  it("shows unknown prefill errors rather than selecting a default target", async () => {
+    renderApp("/attack/chat?target=missing");
+    expect(await screen.findByText(/Target \"missing\" is not registered/)).toBeInTheDocument();
+    expect(screen.queryByTestId("chat-window")).not.toBeInTheDocument();
   });
 
   it("navigates to the registry from the home view", () => {
