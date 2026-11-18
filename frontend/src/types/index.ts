@@ -1294,6 +1294,47 @@ export interface ConversationMessagesResponse {
   partial_message_sequences?: number[]
 }
 
+// --- Agent sessions ---
+
+/** A saved agent chat; its messages are the conversation with the same ID. */
+export interface AgentSession {
+  id: string
+  title: string
+  /** The target that answered the latest message. */
+  target_registry_name: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AgentSessionListResponse {
+  items: AgentSession[]
+}
+
+export interface AgentSessionCreateRequest {
+  title: string
+  target_registry_name: string
+}
+
+export interface AgentSessionRenameRequest {
+  title: string
+}
+
+export interface AgentMessageRequest {
+  target_registry_name: string
+  text: string
+}
+
+export interface AgentSessionMessagesResponse {
+  session: AgentSession
+  /** Every message, including the system prompt, tool calls, and tool results. */
+  messages: BackendMessage[]
+}
+
+/** One row of an agent conversation as the chat shows it. */
+export type AgentTranscriptItem =
+  | { kind: 'user' | 'assistant' | 'error'; id: string; text: string }
+  | { kind: 'tool'; id: string; name: string; arguments: string; output?: string }
+
 export interface MessagePieceRequest {
   data_type: string // 'text' | 'image_path' | 'audio_path' | 'video_path' | 'binary_path'
   original_value: string

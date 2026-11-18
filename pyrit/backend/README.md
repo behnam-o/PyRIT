@@ -701,6 +701,65 @@ from `frontend`. Set `PYRIT_PYTHON` to this worktree's Python interpreter if Vit
 find `python` (for example, `<worktree>\.venv\Scripts\python.exe` on Windows).
 Stop these test-owned servers after the run.
 
+### Agent sessions
+
+The GUI's **Agent** page chats with a registered `OpenAIResponseTarget` that can call this
+server's REST API as [tools](#rest-tools). Each send copies that target with the tools attached;
+the target runs its own tool loop (up to 25 rounds) and `PromptNormalizer` saves every message,
+including tool calls and results. A session is one memory conversation listed in
+`AgentSessionEntries`. It is not an attack result, so it does not appear in attack history or
+analytics.
+
+- `GET /api/agent/sessions` - Sessions, most recently used first
+- `POST /api/agent/sessions` - Create an empty session:
+  `{"title": "...", "target_registry_name": "..."}`
+- `PATCH /api/agent/sessions/{id}` - Rename a session: `{"title": "..."}`. Its place in the list
+  does not change.
+- `GET /api/agent/sessions/{id}/messages` - A session and its messages
+- `POST /api/agent/sessions/{id}/messages` - Send a message, optionally with another target:
+  `{"target_registry_name": "...", "text": "..."}`
+
+Titles are one line of at most 100 characters. The first send saves the system prompt. Sends
+wait for the whole tool loop and return the full conversation. A failed model call is saved as
+an error message instead of failing the request. Each session answers one message at a time:
+another send to it returns 409 until the first finishes, while other sessions are unaffected.
+Tool calls are made with the caller's credentials. A scenario run the agent starts continues in
+the background.
+
+### REST tools
+
+Agent and MCP tools are generated from this server's OpenAPI document; none are hand-written.
+Each operation named in `RestToolset.OPERATIONS` (`pyrit/backend/rest_tools.py`) becomes a tool
+named after its route function, such as `list_scenario_runs`. The tool takes the operation's
+description, its path and query parameters, and its JSON body as `body`. A call is an
+in-process REST request with the caller's `Authorization` header, so it gets the same
+validation, errors, authentication, and runtime admission as any other request. Error
+responses go back to the model as results.
+
+Responses are compacted for the model. Component identifiers keep only readable fields, such
+as class, model, and endpoint. Empty values are dropped, long text is clipped, and results are
+cut to 40,000 characters, keeping the leading list items and pagination. Every tool also
+accepts `response_fields`: dot paths, such as `items.scenario_name`, that keep only part of a
+successful response. A path that matches nothing is reported with the field names available
+where it stopped matching.
+
+To offer another operation, add its name to `RestToolset.OPERATIONS`. The list is curated
+because every tool schema is sent with each model request, and some operations, such as
+reading environment files, must not be given to a model.
+
+### MCP
+
+External MCP clients can use the same [tools](#rest-tools) over Streamable HTTP at `/api/mcp`
+(no trailing slash). Authentication and runtime admission apply as for the rest of `/api`, but
+the compatibility header is not required. For example, in VS Code's `mcp.json`:
+
+```json
+{"servers": {"pyrit": {"type": "http", "url": "http://localhost:8000/api/mcp"}}}
+```
+
+With Entra authentication, the client must also send a bearer token, which each tool call
+forwards.
+
 ### Request Limits
 
 Attachments upload in the background while editing remains available, with up to three
@@ -814,7 +873,7 @@ Problem responses use `application/problem+json` and include `expected` (backend
 `actual` (caller or null), `status`, `title`, and `detail`. On failure, stop further
 business requests and explain which matching artifacts are needed. Do not replay
 mutations. Backend replacement is detected by the next request even after a successful
-startup handshake. Health, authentication discovery, version, and media retain their
+startup handshake. Health, authentication discovery, version, media, and MCP retain their
 existing authentication behavior and bypass only compatibility enforcement.
 
 Example using the packaged CLI client (authentication and handshake are automatic):

@@ -1,0 +1,132 @@
+import { makeStyles, tokens } from '@fluentui/react-components'
+
+import { mobileTouchTarget, mobileTouchTargetHeight, NARROW_VIEWPORT_QUERY } from '@/styles/touchTargets'
+import { WORKSPACE_CANVAS_BACKGROUND } from '@/styles/workspaceBackground'
+
+export const useAgentPageStyles = makeStyles({
+  root: {
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
+    backgroundColor: WORKSPACE_CANVAS_BACKGROUND,
+    [NARROW_VIEWPORT_QUERY]: { flexDirection: 'column' },
+  },
+  sessions: {
+    width: '260px',
+    flexShrink: 0,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS,
+    padding: tokens.spacingHorizontalM,
+    backgroundColor: tokens.colorNeutralBackground2,
+    borderRight: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
+    [NARROW_VIEWPORT_QUERY]: {
+      width: 'auto',
+      maxHeight: '30vh',
+      borderRight: 'none',
+      borderBottom: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
+    },
+  },
+  button: { ...mobileTouchTargetHeight },
+  // Only the list scrolls, so New chat keeps its size however many sessions there are.
+  sessionList: {
+    flex: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    listStyleType: 'none',
+    margin: 0,
+    padding: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
+  },
+  sessionItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXXS,
+  },
+  sessionLink: {
+    flex: 1,
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
+    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalS}`,
+    borderRadius: tokens.borderRadiusMedium,
+    color: tokens.colorNeutralForeground1,
+    textDecorationLine: 'none',
+    ':hover': { backgroundColor: tokens.colorNeutralBackground2Hover },
+    ':focus-visible': {
+      outline: `2px solid ${tokens.colorStrokeFocus2}`,
+      outlineOffset: '-2px',
+    },
+  },
+  activeSession: {
+    backgroundColor: tokens.colorNeutralBackground2Selected,
+    fontWeight: tokens.fontWeightSemibold,
+  },
+  ellipsis: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  sessionTarget: {
+    color: tokens.colorNeutralForeground3,
+    fontSize: tokens.fontSizeBase200,
+  },
+  titleForm: {
+    flex: 1,
+    minWidth: 0,
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXXS,
+    padding: `${tokens.spacingVerticalXS} 0`,
+  },
+  titleInput: { flex: 1, minWidth: 0 },
+  iconButton: { flexShrink: 0, ...mobileTouchTarget },
+  chat: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  notice: {
+    flexShrink: 0,
+    margin: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalXL} 0`,
+  },
+  center: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: tokens.spacingVerticalM,
+    padding: tokens.spacingHorizontalXL,
+    textAlign: 'center',
+  },
+  examples: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: tokens.spacingHorizontalS,
+  },
+  composer: {
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'flex-end',
+    gap: tokens.spacingHorizontalS,
+    padding: tokens.spacingHorizontalL,
+    borderTop: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+    [NARROW_VIEWPORT_QUERY]: { flexWrap: 'wrap' },
+  },
+  model: {
+    width: '280px',
+    flexShrink: 0,
+    [NARROW_VIEWPORT_QUERY]: { width: '100%' },
+  },
+  input: { flex: 1, minWidth: 0 },
+  sendButton: { ...mobileTouchTarget },
+})

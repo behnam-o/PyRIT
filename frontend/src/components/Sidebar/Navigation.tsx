@@ -13,6 +13,7 @@ import {
 } from '@fluentui/react-components'
 import type { MenuCheckedValueChangeData, MenuCheckedValueChangeEvent } from '@fluentui/react-components'
 import {
+  BotSparkleRegular,
   ChatRegular,
   DatabaseRegular,
   HomeRegular,
@@ -36,6 +37,7 @@ import { useNavigationStyles } from './Navigation.styles'
 
 export type ViewName =
   | 'home'
+  | 'agent'
   | 'chat'
   | 'analytics'
   | 'operations'
@@ -62,6 +64,7 @@ interface NavigationItem {
 const THEME_MENU_NAME = 'theme'
 const NAVIGATION_ITEMS: NavigationItem[] = [
   { view: 'home', label: 'Home', icon: <HomeRegular /> },
+  { view: 'agent', label: 'Agent', icon: <BotSparkleRegular /> },
   { view: 'chat', label: 'Attacks', icon: <ChatRegular /> },
   { view: 'scenarios', label: 'Scanner', icon: <TargetRegular /> },
   { view: 'analytics', label: 'Analytics', icon: <DataBarVerticalRegular /> },

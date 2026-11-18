@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 from pyrit.common.lazy_imports import get_lazy_dir, resolve_lazy_export
 
 if TYPE_CHECKING:
+    from pyrit.models.agent_session import AgentSession
     from pyrit.models.analytics import (
         AttackAnalyticsCell,
         AttackAnalyticsConverterDirection,
@@ -515,6 +516,7 @@ _LAZY_EXPORTS: dict[str, str] = {
     "Observation": "pyrit.models.score",
     "ObservationPayload": "pyrit.models.score",
     "ObjectiveTargetEvaluationIdentifier": "pyrit.models.identifiers",
+    "AgentSession": "pyrit.models.agent_session",
     "Operation": "pyrit.models.operation",
     "OperationCreate": "pyrit.models.operation",
     "OperationUsage": "pyrit.models.operation",

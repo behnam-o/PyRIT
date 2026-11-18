@@ -86,6 +86,7 @@ if TYPE_CHECKING:
     from pyrit.memory.memory_embedding import MemoryEmbedding
 
 from pyrit.memory.memory_models import (
+    AgentSessionEntry,
     AtomicAttackIdentifierEntry,
     AttackIdentifierEntry,
     AttackResultEntry,
@@ -122,6 +123,7 @@ from pyrit.memory.storage import (
 from pyrit.models import (
     MEDIA_PATH_DATA_TYPES,
     AdversarialPrompts,
+    AgentSession,
     AtomicAttackEvaluationIdentifier,
     AtomicAttackIdentifier,
     AttackIdentifier,
@@ -1005,6 +1007,69 @@ class MemoryInterface(abc.ABC):
             raise OperationInUseError(operation_id=operation_id, usage=usage) from exc
         usage = await self.get_operation_usage_async(operation_id=operation_id)
         raise OperationInUseError(operation_id=operation_id, usage=usage)
+
+    async def add_agent_session_async(self, agent_session: AgentSession) -> AgentSession:
+        """
+        Save a new agent session.
+
+        Returns:
+            AgentSession: The saved session.
+        """
+        entry = AgentSessionEntry(agent_session)
+        async with await self.get_session_async() as session, session.begin():
+            session.add(entry)
+            await session.flush()
+            return entry.get_agent_session()
+
+    async def get_agent_sessions_async(self, *, session_ids: Sequence[uuid.UUID] | None = None) -> list[AgentSession]:
+        """
+        Read agent sessions, most recently used first, optionally matching IDs.
+
+        Returns:
+            list[AgentSession]: The matching sessions.
+        """
+        statement = select(AgentSessionEntry).order_by(AgentSessionEntry.updated_at.desc())
+        if session_ids is not None:
+            statement = statement.where(AgentSessionEntry.id.in_(session_ids))
+        async with await self.get_session_async() as session:
+            return [entry.get_agent_session() for entry in (await session.scalars(statement)).all()]
+
+    async def touch_agent_session_async(self, *, session_id: uuid.UUID, target_registry_name: str) -> AgentSession:
+        """
+        Record that an agent session was just used with a target.
+
+        Returns:
+            AgentSession: The updated session.
+
+        Raises:
+            LookupError: If the session does not exist.
+        """
+        async with await self.get_session_async() as session, session.begin():
+            entry = await session.get(AgentSessionEntry, session_id)
+            if entry is None:
+                raise LookupError(f"Agent session {session_id} not found")
+            entry.target_registry_name = target_registry_name
+            entry.updated_at = datetime.now(UTC)
+            await session.flush()
+            return entry.get_agent_session()
+
+    async def rename_agent_session_async(self, *, session_id: uuid.UUID, title: str) -> AgentSession:
+        """
+        Rename an agent session without changing when it was last used, which orders the session list.
+
+        Returns:
+            AgentSession: The renamed session.
+
+        Raises:
+            LookupError: If the session does not exist.
+        """
+        async with await self.get_session_async() as session, session.begin():
+            entry = await session.get(AgentSessionEntry, session_id)
+            if entry is None:
+                raise LookupError(f"Agent session {session_id} not found")
+            entry.title = AgentSession.model_validate(entry.get_agent_session().model_dump() | {"title": title}).title
+            await session.flush()
+            return entry.get_agent_session()
 
     async def resolve_operation_id_async(
         self, *, operation_id: uuid.UUID | str | None, operation_name: str | None = None

@@ -39,6 +39,18 @@ to new work; changes do not alter saved results.
 
 ![Home page with workflows and recent work](images/home.png)
 
+## Agent
+
+Select **Agent** in the sidebar to work with PyRIT in plain language. The agent
+can list targets, scenarios, techniques, and datasets, start scenario runs, and
+summarize their results. Each tool it uses appears as a row you can expand to see
+the arguments and result. Choose the agent's model under **Model**; only
+`OpenAIResponseTarget` targets can call tools. Runs start in the background, so
+ask for progress later or open them in Scanner history. Saved sessions are listed
+on the left; select a session's pencil button to rename it. Each session answers
+one message at a time, but you can keep chatting in other sessions while one is
+working. Sessions are not attacks and do not appear in attack history or analytics.
+
 ## Chat
 
 Select **Attacks** in the sidebar to open Chat (`/attack/chat`), the manual conversation

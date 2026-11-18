@@ -54,6 +54,7 @@ describe("Navigation", () => {
 
     expect(labels).toEqual([
       "Home",
+      "Agent",
       "Attacks",
       "Scanner",
       "Analytics",
@@ -81,7 +82,7 @@ describe("Navigation", () => {
     const onNavigate = jest.fn();
     renderWithProvider(<Navigation {...defaultProps} onNavigate={onNavigate} />);
     const destinations: Array<[string, ViewName]> = [
-      ["Home", "home"], ["Attacks", "chat"], ["Scanner", "scenarios"],
+      ["Home", "home"], ["Agent", "agent"], ["Attacks", "chat"], ["Scanner", "scenarios"],
       ["Analytics", "analytics"], ["Operations", "operations"],
       ["Datasets", "datasets"], ["Registry", "registry"], ["Configuration", "configuration"],
     ];
@@ -117,6 +118,7 @@ describe("Navigation", () => {
 
     await user.unhover(screen.getByRole("button", { name: "Attacks" }));
     await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    await user.tab();
     await user.tab();
     await user.tab();
     expect(screen.getByRole("button", { name: "Attacks" })).toHaveFocus();

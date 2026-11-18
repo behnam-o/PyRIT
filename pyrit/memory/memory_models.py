@@ -43,6 +43,7 @@ from pyrit.memory.analytics_identity_v1 import ObjectiveTargetAnalyticsIdentityV
 from pyrit.memory.analytics_sql import ResolvedAttackIdentifierHash
 from pyrit.models import (
     SEED_RESPONSE_JSON_SCHEMA_METADATA_KEY,
+    AgentSession,
     AtomicAttackEvaluationIdentifier,
     AtomicAttackIdentifier,
     AttackIdentifier,
@@ -324,6 +325,41 @@ class OperationEntry(Base):
             Operation: The stored operation.
         """
         return Operation(id=self.id, name=self.name, created_at=self.created_at, description=self.description)
+
+
+class AgentSessionEntry(Base):
+    """A saved agent chat. Its messages are the conversation whose ID is the session ID."""
+
+    __tablename__ = "AgentSessionEntries"
+
+    id: Mapped[uuid.UUID] = mapped_column(CustomUUID, primary_key=True)
+    title: Mapped[str] = mapped_column(Unicode(256), nullable=False)
+    target_registry_name: Mapped[str] = mapped_column(Unicode(256), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+
+    def __init__(self, agent_session: AgentSession) -> None:
+        """Store a validated session."""
+        self.id = agent_session.id
+        self.title = agent_session.title
+        self.target_registry_name = agent_session.target_registry_name
+        self.created_at = agent_session.created_at.astimezone(UTC)
+        self.updated_at = agent_session.updated_at.astimezone(UTC)
+
+    def get_agent_session(self) -> AgentSession:
+        """
+        Rebuild the session model.
+
+        Returns:
+            AgentSession: The stored session.
+        """
+        return AgentSession(
+            id=self.id,
+            title=self.title,
+            target_registry_name=self.target_registry_name,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
 
 class FindingEntry(Base):

@@ -5,6 +5,12 @@ import { decodeBlobErrorAsync, toApiError } from './errors'
 import { compatibility, COMPATIBILITY_HEADER } from './compatibility'
 import { getGraphScopes } from '../auth/msalConfig'
 import type {
+  AgentMessageRequest,
+  AgentSession,
+  AgentSessionCreateRequest,
+  AgentSessionListResponse,
+  AgentSessionMessagesResponse,
+  AgentSessionRenameRequest,
   ApplyChatScorerRequest,
   ApplyChatScorerResponse,
   AttackFindingListResponse,
@@ -113,6 +119,30 @@ import type {
 } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
+
+const agentSessionPath = (sessionId: string): string => `/agent/sessions/${encodeURIComponent(sessionId)}`
+// One agent turn waits for the agent's whole tool loop.
+const AGENT_TURN_TIMEOUT_MS = 10 * 60 * 1000
+
+export const agentSessionsApi = {
+  list: async (): Promise<AgentSessionListResponse> => {
+    return (await apiClient.get('/agent/sessions')).data
+  },
+  getMessages: async (sessionId: string): Promise<AgentSessionMessagesResponse> => {
+    return (await apiClient.get(`${agentSessionPath(sessionId)}/messages`)).data
+  },
+  create: async (request: AgentSessionCreateRequest): Promise<AgentSession> => {
+    return (await apiClient.post('/agent/sessions', request)).data
+  },
+  rename: async (sessionId: string, request: AgentSessionRenameRequest): Promise<AgentSession> => {
+    return (await apiClient.patch(agentSessionPath(sessionId), request)).data
+  },
+  send: async (sessionId: string, request: AgentMessageRequest): Promise<AgentSessionMessagesResponse> => {
+    return (await apiClient.post(`${agentSessionPath(sessionId)}/messages`, request, {
+      timeout: AGENT_TURN_TIMEOUT_MS,
+    })).data
+  },
+}
 
 export const mediaApi = {
   upload: async (request: MediaUploadRequest): Promise<MediaUploadResponse> => {

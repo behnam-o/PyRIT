@@ -8,6 +8,7 @@ import { UserPreferencesProvider, useUserPreferences } from './hooks/useUserPref
 import { RuntimeBanner, RuntimeProvider, useRuntime } from '@/hooks/useRuntime'
 import MainLayout from './components/Layout/MainLayout'
 import PageNotFound from './components/Layout/PageNotFound'
+import AgentPage from './components/Agent/AgentPage'
 import ChatWindow from './components/Chat/ChatWindow'
 import AttackNotFound from './components/Chat/AttackNotFound'
 import Home from './components/Home/Home'
@@ -98,6 +99,7 @@ const HISTORY_SCANNER_PATH = '/scanner/history'
 /** Maps each navigable view to its canonical URL path. */
 const VIEW_PATHS: Record<ViewName, string> = {
   home: '/',
+  agent: '/agent',
   chat: '/attack/chat',
   analytics: '/analytics',
   operations: '/operations',
@@ -122,6 +124,9 @@ function viewFromPath(pathname: string): ViewName {
   }
   if (pathname.startsWith(`${VIEW_PATHS.operations}/`)) {
     return 'operations'
+  }
+  if (pathname.startsWith(`${VIEW_PATHS.agent}/`)) {
+    return 'agent'
   }
   if (
     pathname === '/scanner/launch'
@@ -1049,6 +1054,7 @@ function AppContent({ operatorAlias }: { operatorAlias: string | null }) {
               <Route path="/analytics" element={<AnalyticsPage onOpenAttack={handleOpenAttack} />} />
               <Route path="/operations" element={<OperationsPage />} />
               <Route path="/operations/:operationId" element={<OperationDetailPage onOperationChanged={operation.retry} />} />
+              <Route path="/agent/:sessionId?" element={<AgentPage targets={registry.targets} targetsLoading={registry.loading} />} />
               <Route path="/findings" element={<Navigate to="/operations" replace />} />
               <Route
                 path={HISTORY_ATTACKS_PATH}
